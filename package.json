@@ -1,0 +1,60 @@
+{
+  "name": "moyoy-lp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x",
+    "pnpm": "10.34.5"
+  },
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start:test": "next start --hostname 127.0.0.1 --port 4173",
+    "check:runtime": "node scripts/check-runtime.mjs",
+    "policy:public": "node scripts/check-public-repo-policy.mjs --mode=candidates",
+    "policy:staged": "node scripts/check-public-repo-policy.mjs --mode=staged",
+    "audit:production": "pnpm audit --prod --audit-level=high",
+    "audit:development": "node scripts/check-dev-audit-policy.mjs",
+    "format": "node scripts/run-format.mjs --write",
+    "format:check": "node scripts/run-format.mjs --check",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "node --test tests/scripts/*.test.mjs && vitest run --coverage",
+    "test:e2e": "playwright test tests/e2e --project=chromium --project=firefox --project=webkit",
+    "test:a11y": "playwright test tests/a11y --project=chromium --project=firefox --project=webkit",
+    "test:visual": "playwright test tests/visual --project=visual-chromium",
+    "test:visual:update": "playwright test tests/visual --project=visual-chromium --update-snapshots",
+    "capture:fidelity": "playwright test tests/fidelity --project=fidelity-chromium",
+    "candidate:preflight": "node scripts/check-candidate-preflight.mjs",
+    "test:fidelity": "node scripts/run-fidelity.mjs",
+    "test:lhci": "lhci autorun --config=lighthouserc.cjs",
+    "verify:foundation": "pnpm check:runtime && pnpm policy:public && pnpm audit:production && pnpm audit:development && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm build && pnpm test:e2e && pnpm test:a11y && pnpm test:visual && pnpm test:lhci",
+    "verify:technical-candidate": "pnpm verify:foundation && pnpm capture:fidelity && pnpm test:fidelity && pnpm candidate:preflight"
+  },
+  "dependencies": {
+    "next": "16.3.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "sharp": "0.35.3"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@lhci/cli": "0.15.1",
+    "@playwright/test": "1.62.1",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitest/coverage-v8": "4.1.10",
+    "ajv": "8.20.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.1",
+    "postcss": "8.5.26",
+    "prettier": "3.9.6",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}

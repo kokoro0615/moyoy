@@ -1,0 +1,67 @@
+# Incoming source material is preserved outside Git history.
+/20260818_web/
+/.private/
+
+# Source masters and opaque source archives are private regardless of location.
+*.ai
+*.ait
+*.eps
+*.pdf
+*.psd
+*.psb
+*.indd
+*.idml
+*.sketch
+*.fig
+*.xcf
+*.dng
+*.cr2
+*.cr3
+*.nef
+*.arw
+*.raf
+*.orf
+*.rw2
+*.rwl
+*.pef
+*.srw
+*.3fr
+*.iiq
+*.otf
+*.ttf
+*.ttc
+*.dfont
+*.zip
+*.7z
+*.rar
+*.tar
+*.tgz
+*.gz
+
+# Local environment and deployment linkage.
+.env
+.env.*
+!.env.example
+/.vercel/
+
+# Dependencies and framework output.
+/node_modules/
+/.next/
+/out/
+/dist/
+*.tsbuildinfo
+
+# Test, audit, and generated evidence.
+/artifacts/
+/coverage/
+/playwright-report/
+/test-results/
+/.lighthouseci/
+/C:*lighthouse.*/
+
+# Tool and operating-system noise.
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

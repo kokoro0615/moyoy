@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "policy": "protected-review-trusted-fidelity-signers",
+  "requiredRole": "fidelity-reference-approver",
+  "signers": []
+}

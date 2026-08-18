@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "policy": "public-code-and-sanitized-docs-only",
+  "approvedFiles": [
+    {
+      "path": "tests/visual/__screenshots__/foundation-390x844-visual-chromium-linux.png",
+      "sha256": "192b6395330871b0cd1101c745a8ceedcebf2320b031cac612af0e34bd01fec6",
+      "mediaType": "image/png",
+      "classification": "synthetic-foundation-baseline",
+      "rightsStatus": "not-applicable-synthetic",
+      "purpose": "Synthetic foundation visual-regression baseline; contains no client source material.",
+      "approvalStatus": "approved-public"
+    },
+    {
+      "path": "tests/visual/__screenshots__/foundation-768x1024-visual-chromium-linux.png",
+      "sha256": "7c3a047b131e244203112b9180baad0d3f5a84e9dc3cf3cbee976025d777fb84",
+      "mediaType": "image/png",
+      "classification": "synthetic-foundation-baseline",
+      "rightsStatus": "not-applicable-synthetic",
+      "purpose": "Synthetic foundation visual-regression baseline; contains no client source material.",
+      "approvalStatus": "approved-public"
+    },
+    {
+      "path": "tests/visual/__screenshots__/foundation-visual-chromium-linux.png",
+      "sha256": "dbbb7bf83b2de83995ac450ddd16a41ec94ecb97e7342659b3e263765336fe7c",
+      "mediaType": "image/png",
+      "classification": "synthetic-foundation-baseline",
+      "rightsStatus": "not-applicable-synthetic",
+      "purpose": "Synthetic foundation visual-regression baseline; contains no client source material.",
+      "approvalStatus": "approved-public"
+    }
+  ]
+}

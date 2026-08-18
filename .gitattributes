@@ -1,0 +1,35 @@
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.avif binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.eps binary
+*.psd binary
+*.psb binary
+*.ai binary
+*.ait binary
+*.indd binary
+*.idml binary
+*.sketch binary
+*.fig binary
+*.xcf binary
+*.otf binary
+*.ttf binary
+*.ttc binary
+*.dfont binary
+*.wasm binary
+*.mp4 binary
+*.webm binary
+*.mov binary
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.woff binary
+*.woff2 binary
+
+pnpm-lock.yaml text eol=lf

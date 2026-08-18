@@ -1,0 +1,315 @@
+{
+  "schemaVersion": 2,
+  "foundationOnly": true,
+  "route": "/",
+  "approvalManifest": ".private/approvals/fidelity-approval.json",
+  "evidenceContract": {
+    "status": "unavailable",
+    "manifest": "artifacts/fidelity/comparisons/fidelity-evidence-manifest.json",
+    "schemaVersion": 1,
+    "reason": "Approved executable landmark detectors, region masks, and exact-frame references are unavailable."
+  },
+  "captureEnvironment": {
+    "colorScheme": "light",
+    "deviceScaleFactor": 1,
+    "locale": "ja-JP",
+    "timezoneId": "Asia/Tokyo"
+  },
+  "captureArtifacts": {
+    "schemaVersion": 1,
+    "runsRoot": "artifacts/fidelity/captures/runs",
+    "runManifestFile": "capture-run-manifest.json"
+  },
+  "frames": [
+    {
+      "id": "lp-1440x900-menu-closed-top",
+      "label": "lp-1440x900",
+      "viewport": { "width": 1440, "height": 900 },
+      "route": "/",
+      "state": { "id": "menu-closed", "setup": "none" },
+      "scroll": { "x": 0, "y": 0 },
+      "semanticObservation": {
+        "id": "desktop-top",
+        "semantic": "top",
+        "status": "blocked",
+        "selector": "main[data-foundation-only='true']",
+        "scrollStrategy": { "kind": "absolute", "x": 0, "y": 0 },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": { "data-foundation-only": "true" }
+        },
+        "landmarkIds": [],
+        "regionIds": [],
+        "reason": "This observes only the foundation marker; approved production top semantics and geometry remain unavailable."
+      },
+      "readiness": {
+        "selector": "main[data-foundation-only='true']",
+        "images": "decode"
+      },
+      "capture": { "fullPage": false },
+      "reference": ".private/references/approved/lp-1440x900.png",
+      "actualFile": "lp-1440x900.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame external reference is missing."
+      },
+      "geometryContract": {
+        "status": "blocked",
+        "executionStatus": "unavailable",
+        "landmarks": [],
+        "regions": [],
+        "reason": "Approved symmetric landmark detectors and region masks are missing."
+      },
+      "thresholds": null
+    },
+    {
+      "id": "lp-768x1024-menu-closed-top",
+      "label": "lp-768x1024",
+      "viewport": { "width": 768, "height": 1024 },
+      "route": "/",
+      "state": { "id": "menu-closed", "setup": "none" },
+      "scroll": { "x": 0, "y": 0 },
+      "semanticObservation": {
+        "id": "tablet-top",
+        "semantic": "top",
+        "status": "blocked",
+        "selector": "main[data-foundation-only='true']",
+        "scrollStrategy": { "kind": "absolute", "x": 0, "y": 0 },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": { "data-foundation-only": "true" }
+        },
+        "landmarkIds": [],
+        "regionIds": [],
+        "reason": "This observes only the foundation marker; approved tablet semantics and geometry remain unavailable."
+      },
+      "readiness": {
+        "selector": "main[data-foundation-only='true']",
+        "images": "decode"
+      },
+      "capture": { "fullPage": false },
+      "reference": ".private/references/approved/lp-768x1024.png",
+      "actualFile": "lp-768x1024.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved tablet composition and exact-frame reference are missing."
+      },
+      "geometryContract": {
+        "status": "blocked",
+        "executionStatus": "unavailable",
+        "landmarks": [],
+        "regions": [],
+        "reason": "Approved symmetric landmark detectors and region masks are missing."
+      },
+      "thresholds": null
+    },
+    {
+      "id": "lp-390x844-menu-closed-top",
+      "label": "lp-390x844",
+      "viewport": { "width": 390, "height": 844 },
+      "route": "/",
+      "state": { "id": "menu-closed", "setup": "none" },
+      "scroll": { "x": 0, "y": 0 },
+      "semanticObservation": {
+        "id": "mobile-top",
+        "semantic": "top",
+        "status": "blocked",
+        "selector": "main[data-foundation-only='true']",
+        "scrollStrategy": { "kind": "absolute", "x": 0, "y": 0 },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": { "data-foundation-only": "true" }
+        },
+        "landmarkIds": [],
+        "regionIds": [],
+        "reason": "This observes only the foundation marker; approved mobile semantics and geometry remain unavailable."
+      },
+      "readiness": {
+        "selector": "main[data-foundation-only='true']",
+        "images": "decode"
+      },
+      "capture": { "fullPage": false },
+      "reference": ".private/references/approved/lp-390x844.png",
+      "actualFile": "lp-390x844.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved 390 px mapping and exact-frame reference are missing."
+      },
+      "geometryContract": {
+        "status": "blocked",
+        "executionStatus": "unavailable",
+        "landmarks": [],
+        "regions": [],
+        "reason": "Approved symmetric landmark detectors and region masks are missing."
+      },
+      "thresholds": null
+    }
+  ],
+  "requiredCoverage": [
+    {
+      "id": "desktop-top-menu-closed",
+      "status": "blocked",
+      "frameIds": ["lp-1440x900-menu-closed-top"],
+      "observations": [
+        {
+          "id": "desktop-top",
+          "status": "unavailable",
+          "frameId": "lp-1440x900-menu-closed-top",
+          "semanticObservationId": "desktop-top",
+          "semantic": "top",
+          "landmarkResultIds": [],
+          "regionResultIds": [],
+          "reason": "No approved detectors or masks are available for this frame."
+        }
+      ],
+      "reason": "Clean approved desktop exact-frame reference is missing."
+    },
+    {
+      "id": "desktop-root-dusk-dawn-alpine-footer",
+      "status": "blocked",
+      "frameIds": [],
+      "observations": [
+        {
+          "id": "desktop-root",
+          "status": "unavailable",
+          "frameId": null,
+          "semanticObservationId": null,
+          "semantic": "root",
+          "landmarkResultIds": [],
+          "regionResultIds": [],
+          "reason": "Approved ROOT scroll framing is unavailable."
+        },
+        {
+          "id": "desktop-dusk",
+          "status": "unavailable",
+          "frameId": null,
+          "semanticObservationId": null,
+          "semantic": "dusk",
+          "landmarkResultIds": [],
+          "regionResultIds": [],
+          "reason": "Approved DUSK scroll framing is unavailable."
+        },
+        {
+          "id": "desktop-dawn",
+          "status": "unavailable",
+          "frameId": null,
+          "semanticObservationId": null,
+          "semantic": "dawn",
+          "landmarkResultIds": [],
+          "regionResultIds": [],
+          "reason": "Approved DAWN scroll framing is unavailable."
+        },
+        {
+          "id": "desktop-alpine",
+          "status": "unavailable",
+          "frameId": null,
+          "semanticObservationId": null,
+          "semantic": "alpine",
+          "landmarkResultIds": [],
+          "regionResultIds": [],
+          "reason": "Approved ALPINE scroll framing is unavailable."
+        },
+        {
+          "id": "desktop-footer",
+          "status": "unavailable",
+          "frameId": null,
+          "semanticObservationId": null,
+          "semantic": "footer",
+          "landmarkResultIds": [],
+          "regionResultIds": [],
+          "reason": "Approved footer scroll framing is unavailable."
+        }
+      ],
+      "reason": "Approved chapter scroll frames, focal anchors, landmarks, and region masks are missing."
+    },
+    {
+      "id": "tablet-top-menu-closed",
+      "status": "blocked",
+      "frameIds": ["lp-768x1024-menu-closed-top"],
+      "observations": [
+        {
+          "id": "tablet-top",
+          "status": "unavailable",
+          "frameId": "lp-768x1024-menu-closed-top",
+          "semanticObservationId": "tablet-top",
+          "semantic": "top",
+          "landmarkResultIds": [],
+          "regionResultIds": [],
+          "reason": "No approved detectors or masks are available for this frame."
+        }
+      ],
+      "reason": "Tablet composition is not approved."
+    },
+    {
+      "id": "mobile-top-menu-closed",
+      "status": "blocked",
+      "frameIds": ["lp-390x844-menu-closed-top"],
+      "observations": [
+        {
+          "id": "mobile-top",
+          "status": "unavailable",
+          "frameId": "lp-390x844-menu-closed-top",
+          "semanticObservationId": "mobile-top",
+          "semantic": "top",
+          "landmarkResultIds": [],
+          "regionResultIds": [],
+          "reason": "No approved detectors or masks are available for this frame."
+        }
+      ],
+      "reason": "The 375-to-390 mapping is not approved."
+    },
+    {
+      "id": "menu-open-all-viewports",
+      "status": "blocked",
+      "frameIds": [],
+      "observations": [
+        {
+          "id": "desktop-menu-open",
+          "status": "unavailable",
+          "frameId": null,
+          "semanticObservationId": null,
+          "semantic": "menu-open",
+          "landmarkResultIds": [],
+          "regionResultIds": [],
+          "reason": "Approved desktop modal frame is unavailable."
+        },
+        {
+          "id": "tablet-menu-open",
+          "status": "unavailable",
+          "frameId": null,
+          "semanticObservationId": null,
+          "semantic": "menu-open",
+          "landmarkResultIds": [],
+          "regionResultIds": [],
+          "reason": "Approved tablet modal frame is unavailable."
+        },
+        {
+          "id": "mobile-menu-open",
+          "status": "unavailable",
+          "frameId": null,
+          "semanticObservationId": null,
+          "semantic": "menu-open",
+          "landmarkResultIds": [],
+          "regionResultIds": [],
+          "reason": "Approved mobile modal frame is unavailable."
+        }
+      ],
+      "reason": "Clean PC/SP modal exports and interaction states are missing."
+    }
+  ]
+}

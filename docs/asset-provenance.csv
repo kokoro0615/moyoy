@@ -1,0 +1,16 @@
+asset_id,role,natural_dimensions,color_source,owner,license,status,intended_output,loading,alt_intent,public_policy
+brand-mark,MOYOY brand mark,vector,Illustrator vector,unverified,unverified,pending-rights,SVG,inline-or-static,brand identity,approved-derivative-only
+contour-lines,signature topographic line system,vector,Illustrator vector,unverified,unverified,pending-rights,SVG,decorative,empty alt / aria-hidden,approved-derivative-only
+product-drawings,perfume and diffuser line illustrations,vector,Illustrator vector,unverified,unverified,pending-rights,SVG,lazy below fold,decorative when adjacent text names product,approved-derivative-only
+chapter-root,ROOT chapter photograph,7349x11024,CMYK Japan Color profile,unverified,unverified,pending-rights,AVIF+WebP+JPEG art-directed,lazy,deep green forest with a bent tree,approved-derivative-only
+chapter-dusk,DUSK chapter photograph,6356x11024,CMYK Japan Color profile,unverified,unverified,pending-rights,AVIF+WebP+JPEG art-directed,lazy,orange sun over a mountain landscape,approved-derivative-only
+chapter-dawn,DAWN chapter photograph,7349x11024,CMYK Japan Color profile,unverified,unverified,pending-rights,AVIF+WebP+JPEG art-directed,lazy,sunbeams through a green forest,approved-derivative-only
+chapter-alpine,ALPINE chapter photograph,6117x11024,CMYK Japan Color profile,unverified,unverified,pending-rights,AVIF+WebP+JPEG art-directed,lazy,snow-covered alpine ridges,approved-derivative-only
+news-01,NEWS placeholder portrait,879x587,RGB,unverified,unverified,placeholder,none until replaced,lazy,TBD from approved article context,exclude
+news-02,NEWS placeholder speaker scene,1000x667,RGB,unverified,unverified,placeholder,none until replaced,lazy,TBD from approved article context,exclude
+news-03,NEWS placeholder meeting scene,640x427,RGB,unverified,unverified,placeholder,none until replaced,lazy,TBD from approved article context,exclude
+news-04,NEWS placeholder third-party booth visual,1067x600,RGBA,third-party unknown,unverified,placeholder,none until replaced,lazy,TBD from approved article context,exclude
+news-05,NEWS placeholder construction scene,602x401,RGB,unverified,unverified,placeholder,none until replaced,lazy,TBD from approved article context,exclude
+browser-frame,presentation browser frame,1298px wide slices,RGB,designer artifact,not applicable,exclude,none,none,not page content,exclude
+font-futura-pt,Futura PT text roles,font files not supplied,licensed webfont required,unverified,unverified,pending-rights,WOFF2 or approved hosted project,critical subset only,not applicable,licensed-delivery-only
+font-shuei-gin,DNP Shuei Go Gin text roles,font files not supplied,licensed webfont required,unverified,unverified,pending-rights,WOFF2 or approved hosted project,critical subset only,not applicable,licensed-delivery-only

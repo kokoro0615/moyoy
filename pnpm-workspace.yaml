@@ -1,0 +1,13 @@
+packages:
+  - "."
+
+strictPeerDependencies: true
+autoInstallPeers: true
+preferFrozenLockfile: true
+verifyStoreIntegrity: true
+saveExact: true
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

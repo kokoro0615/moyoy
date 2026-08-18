@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "owner": "MOYOY technical owner",
+  "reviewBy": "2026-11-18",
+  "scope": "Development-only LHCI dependency graph; production dependencies are audited separately and may not use these exceptions.",
+  "exceptions": [
+    {
+      "advisoryId": 1109537,
+      "githubAdvisoryId": "GHSA-52f5-9888-hmc6",
+      "module": "tmp",
+      "severity": "low",
+      "paths": [".>@lhci/cli>inquirer>external-editor>tmp", ".>@lhci/cli>tmp"],
+      "rationale": "LHCI is development-only and receives no untrusted tmp dir/prefix input in this repository. The affected calls run in an ephemeral local/CI audit workspace. Upgrade or remove LHCI when its dependency graph is fixed."
+    },
+    {
+      "advisoryId": 1119441,
+      "githubAdvisoryId": "GHSA-w5hq-g745-h8pq",
+      "module": "uuid",
+      "severity": "moderate",
+      "paths": [".>@lhci/cli>uuid"],
+      "rationale": "LHCI uses this development-only dependency for identifiers; the repository does not invoke the affected buffer-writing API. Upgrade or remove LHCI when its dependency graph is fixed."
+    },
+    {
+      "advisoryId": 1120654,
+      "githubAdvisoryId": "GHSA-ph9p-34f9-6g65",
+      "module": "tmp",
+      "severity": "high",
+      "paths": [".>@lhci/cli>inquirer>external-editor>tmp", ".>@lhci/cli>tmp"],
+      "rationale": "LHCI is development-only and receives no untrusted prefix/postfix input in this repository. The affected calls run in an ephemeral local/CI audit workspace. Upgrade or remove LHCI when its dependency graph is fixed."
+    },
+    {
+      "advisoryId": 1139346,
+      "githubAdvisoryId": "GHSA-jmr9-qjv8-65gv",
+      "module": "extract-zip",
+      "severity": "high",
+      "paths": [
+        ".>@lhci/cli>lighthouse>puppeteer-core>@puppeteer/browsers>extract-zip"
+      ],
+      "rationale": "The vulnerable browser-download extraction path is not used: browsers are installed by the pinned Playwright gate and LHCI launches the installed Chromium. npm currently has no patched extract-zip release (the advisory names >=2.0.2, while 2.0.1 remains latest). Recheck by the review date and upgrade or remove LHCI when fixed."
+    }
+  ]
+}
