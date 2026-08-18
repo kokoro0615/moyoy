@@ -7,13 +7,15 @@ Live target: `https://moyoy.vercel.app/`
 ## Remote baseline
 
 The configured GitHub origin is public and had no commit, branch, tag, or file at audit
-time. The local project is now an independent Git repository on `main`. A code-only
-foundation was created after the remote observation, but it remains uncommitted; the
-incoming design bundle remains ignored and untracked.
+time. The local project is an independent Git repository on `main`, and local commit
+`c78be61` now establishes the audited code-only foundation. It has not been pushed; no
+remote or deployment state was changed by this workflow. The incoming design bundle
+remains ignored and untracked.
 
-This is not a recoverable application baseline. The first commit must be
-code/documentation only; private source assets must never be included merely to create a
-baseline.
+The observed empty remote is still not a recoverable application baseline. The local
+commit provides a recoverable local code/documentation baseline only. Private source
+assets must never be included merely to populate the remote, and any push remains a
+separate human-authorized action.
 
 ## Live state
 
@@ -55,7 +57,8 @@ must not be attributed to the future application.
 
 ## Required recovery sequence
 
-1. Keep the public remote code-only and establish a tracked local baseline.
+1. Preserve the committed local code-only baseline and keep private intake out of any
+   future push.
 2. Confirm the authorized Vercel team/scope, project, plan, and intended alias.
 3. Configure protected Preview before exposing client material.
 4. Deploy only after source/privacy, asset rights, and production build gates are

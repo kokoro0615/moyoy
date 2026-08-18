@@ -128,7 +128,7 @@ follow-up.
 
 ## Current blockers
 
-- no committed clean baseline;
+- no CI evidence for local code-only baseline commit `c78be61`;
 - no trusted approval signer or valid signed reference manifest;
 - no approved clean exact-frame PC/tablet/mobile/menu references;
 - no concrete chapter/footer/menu-open frame matrix;

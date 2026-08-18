@@ -82,7 +82,8 @@ implementation work.
    deployment ownership.
 2. Obtain clean PC/SP/modal exports and approve tablet/390 responsive behavior.
 3. Close the measured-spec gaps and approve thresholds.
-4. Bootstrap the exact-pinned Next.js toolchain and tracked code-only baseline.
+4. Maintain the exact-pinned Next.js toolchain and committed code-only baseline without
+   admitting raw intake.
 5. Build semantic static content and small client islands.
 6. Run deterministic external-reference fidelity at 1440×900, 768×1024, and 390×844,
    with menu states.
@@ -168,7 +169,7 @@ LHCI dev-only dependency advisories.
 
 | Gate               | Status          | Reason                                                                                       |
 | ------------------ | --------------- | -------------------------------------------------------------------------------------------- |
-| A — truth          | BLOCKED         | no tracked baseline; copy, rights, NEWS, destinations unresolved                             |
+| A — truth          | BLOCKED         | local code-only baseline exists; copy, rights, NEWS, and destinations remain unresolved       |
 | B — direction      | PARTIAL         | organic direction is supplied; no generated exploration required                             |
 | C — measured spec  | BLOCKED         | modal, tablet/390 mapping, annotation parameters, type metrics, clean exports, approvals missing |
 | D — implementation | FOUNDATION ONLY | application shell/config/gate harness exists; production UI absent                           |
@@ -176,10 +177,12 @@ LHCI dev-only dependency advisories.
 
 The strict Mode C audit initially reported no tracked files, no reference-fidelity
 package surface, and no CI. After the foundation shell, package/Playwright/fidelity
-harness, and CI workflow were added, the fresh 2026-08-18 rerun reported **19 PASS, 0
-WARN, 1 BLOCK**. The remaining `git.tracking` block is the absent first commit. No CI-run
-or approved external-reference evidence exists, so configuration alone does not pass a
-gate.
+harness, and CI workflow were added, the pre-baseline rerun reported **19 PASS, 0 WARN,
+1 BLOCK** because `git.tracking` had no first commit. Local commit `c78be61` now
+establishes the audited code-only baseline, and the fresh 2026-08-18 strict rerun reports
+**20 PASS, 0 WARN, 0 BLOCK**. This is a project-structure audit result only. No push,
+deployment, CI-run, trusted signer, or approved external-reference evidence exists, so
+Gate C/E remain blocked.
 
 ## TODO
 
@@ -188,7 +191,6 @@ gate.
   timing, easing, distance, target binding, or sticky/fixed behavior.
 - Approve the sanitized provenance ledger and add rights evidence privately.
 - Obtain clean source exports and finish measured typography/SP geometry.
-- Establish a code-only first commit without raw intake.
 - Exercise the configured CI/comparator gates and establish a protected Preview.
 - Repeat live audit after a real deployment exists.
 
@@ -235,3 +237,7 @@ whenever an answer changes architecture, content, rights, or acceptance.
 - Replaced fixed capture sidecars with opaque content-addressed immutable runs and a
   hash-bound `COMPLETE` run manifest; changed build provenance creates a new preserved
   run, identical reruns reuse exact bytes, and stale current-run pointers fail closed.
+- Established local code-only baseline commit `c78be61`; a fresh strict Mode C audit
+  reports 20 PASS, 0 WARN, and 0 BLOCK. No push or deployment occurred, and missing
+  approved references, rights, signer/approval evidence, and CI execution keep Gate C/E
+  blocked.

@@ -332,16 +332,19 @@ The machine-facing and human-facing requirements are consolidated in
 
 | Gate                     | Status          | Evidence / blocker                                                                                |
 | ------------------------ | --------------- | ------------------------------------------------------------------------------------------------- |
-| A — truth ready          | BLOCKED         | no tracked baseline; copy, NEWS behavior, destinations, rights unresolved                         |
+| A — truth ready          | BLOCKED         | local code-only baseline exists; copy, NEWS behavior, destinations, and rights remain unresolved   |
 | B — direction approved   | PARTIAL         | supplied organic direction accepted for specification; no new generation needed                   |
 | C — specification ready  | BLOCKED         | modal, tablet/390 mapping, annotation parameters, typography, SP measurements, clean exports, threshold approval missing |
 | D — implementation ready | FOUNDATION ONLY | application shell/config/gate harness exists; production UI intentionally absent                  |
-| E — human release approval | BLOCKED       | no passing technical evidence, approved diff artifacts, live deployment, or stakeholder approval  |
+| E — human release approval | BLOCKED       | no CI run, signed approval, approved diff artifacts, live deployment, or stakeholder approval      |
 
 The initial strict project audit reported three blockers: no tracked project files, no
 reference-fidelity script/package surface, and no CI workflow. After the pinned
-package/Playwright/fidelity harness and repository instructions were added, the fresh
-2026-08-18 strict Mode C rerun reported **19 PASS, 0 WARN, 1 BLOCK**. The remaining
-block is `git.tracking` because no first commit exists. There is still no CI-run
-evidence or approved target/current capture pair; this rerun does not close Gate A, C,
-comparison, CI, or human release approval.
+package/Playwright/fidelity harness and repository instructions were added, the
+pre-baseline rerun reported **19 PASS, 0 WARN, 1 BLOCK** because `git.tracking` had no
+first commit. Local code-only baseline commit `c78be61` now exists, and the fresh
+2026-08-18 strict Mode C rerun reports **20 PASS, 0 WARN, 0 BLOCK**. This structural
+audit does not supply the missing approved references, selectors/detectors/masks,
+rights, trusted signer or signed approval, CI-run evidence, target/current comparison,
+or stakeholder decision; Gate A, C, comparison, CI, and human release approval remain
+open or blocked as stated above. No push or deployment occurred.
