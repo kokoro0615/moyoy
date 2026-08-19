@@ -2,9 +2,10 @@
 
 import { constants, createReadStream } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
-import { lstat, link, mkdir, open, realpath, unlink } from "node:fs/promises";
+import { lstat, link, mkdir, open, readFile, realpath, unlink } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const SAFE_ARTIFACT_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -103,6 +104,24 @@ const actual = await sharp(actualPath)
   .toBuffer();
 
 const metrics = compare(reference, actual, width, height, args.pixelThreshold);
+const geometry = args.config
+  ? await executeGeometryContract({
+      actual,
+      args,
+      height,
+      projectRoot,
+      reference,
+      sharp,
+      width,
+    })
+  : {
+      landmarkResults: [],
+      regionResults: [],
+      status: "UNAVAILABLE",
+      failures: [
+        "No executed, hash-bound landmark detector or region-mask result was supplied.",
+      ],
+    };
 const mapping = {
   referenceRaster: {
     width: referenceMetadata.width,
@@ -180,6 +199,10 @@ const globalStatus = hasAcceptanceGate
     ? "PASS"
     : "FAIL"
   : "MEASURED";
+const evidenceFailures = [
+  ...(globalStatus === "FAIL" ? failures : []),
+  ...geometry.failures,
+];
 const artifactBuffers = {
   difference: differencePng,
   overlay: overlayPng,
@@ -228,16 +251,14 @@ const report = {
     failures,
   },
   thresholds,
-  landmarkResults: [],
-  regionResults: [],
-  status: "UNAVAILABLE",
-  failures: [
-    "No executed, hash-bound landmark detector or region-mask result was supplied.",
-  ],
-  evidenceStatus: "UNAVAILABLE",
-  evidenceFailures: [
-    "No executed, hash-bound landmark detector or region-mask result was supplied.",
-  ],
+  landmarkResults: geometry.landmarkResults,
+  regionResults: geometry.regionResults,
+  status:
+    globalStatus === "PASS" && geometry.status === "PASS" ? "PASS" : "UNAVAILABLE",
+  failures: evidenceFailures,
+  evidenceStatus:
+    globalStatus === "PASS" && geometry.status === "PASS" ? "PASS" : "UNAVAILABLE",
+  evidenceFailures,
   artifacts,
 };
 const reportBuffer = Buffer.from(`${JSON.stringify(report, null, 2)}\n`);
@@ -267,7 +288,8 @@ process.stdout.write(
   `  ${globalStatus}${failures.length ? `: ${failures.join("; ")}` : ""}` +
     `${hasAcceptanceGate ? "" : ": no acceptance thresholds supplied"}\n`,
 );
-process.exitCode = failures.length === 0 ? 0 : 1;
+process.exitCode =
+  failures.length === 0 && (!args.config || geometry.status === "PASS") ? 0 : 1;
 
 function compare(reference, actual, width, height, pixelThreshold) {
   const difference = Buffer.alloc(width * height * 3);
@@ -295,6 +317,246 @@ function compare(reference, actual, width, height, pixelThreshold) {
     diffRatio: differentPixels / (width * height),
     edgeMae: compareEdges(reference, actual, width, height),
     difference,
+  };
+}
+
+async function executeGeometryContract({
+  actual,
+  args,
+  height,
+  projectRoot,
+  reference,
+  sharp,
+  width,
+}) {
+  if (!args.frameId) failUsage("--frame-id is required with --config");
+  const configFile = await resolveProjectFile(projectRoot, args.config, "config");
+  const configBytes = await readFile(configFile.absolute);
+  const configHash = sha256Buffer(configBytes);
+  if (args.configSha256 && args.configSha256 !== configHash) {
+    fail("config file does not match --config-sha256");
+  }
+  let config;
+  try {
+    config = JSON.parse(configBytes.toString("utf8"));
+  } catch {
+    fail("config is invalid JSON");
+  }
+  const frame = config.frames?.find((candidate) => candidate.id === args.frameId);
+  if (!frame) fail(`frame is missing from config: ${args.frameId}`);
+  const contract = frame.geometryContract;
+  if (contract?.status !== "approved" || contract?.executionStatus !== "available") {
+    fail(`geometry contract is unavailable for ${args.frameId}`);
+  }
+
+  const landmarkResults = [];
+  for (const landmark of contract.landmarks ?? []) {
+    const detectorFile = await resolveProjectFile(
+      projectRoot,
+      landmark.detector?.path,
+      `${landmark.id} detector`,
+    );
+    const detectorHash = await sha256File(detectorFile.absolute);
+    if (detectorHash !== landmark.detector?.sha256) {
+      fail(`${landmark.id} detector hash mismatch`);
+    }
+    const detector = await import(
+      `${pathToFileURL(detectorFile.absolute).href}?sha256=${detectorHash}`
+    );
+    if (typeof detector.detectLandmark !== "function") {
+      fail(`${landmark.id} detector does not export detectLandmark`);
+    }
+    const referenceResult = detector.detectLandmark({
+      channels: 3,
+      data: reference,
+      height,
+      parameters: landmark.parameters,
+      width,
+    });
+    const actualResult = detector.detectLandmark({
+      channels: 3,
+      data: actual,
+      height,
+      parameters: landmark.parameters,
+      width,
+    });
+    const deltaPx = Math.abs(referenceResult.position - actualResult.position);
+    const landmarkFailures = [];
+    if (deltaPx > landmark.thresholds.maxDeltaPx) {
+      landmarkFailures.push(
+        `position delta ${deltaPx}px > ${landmark.thresholds.maxDeltaPx}px`,
+      );
+    }
+    if (referenceResult.confidence < landmark.thresholds.minConfidence) {
+      landmarkFailures.push("reference detector confidence is below threshold");
+    }
+    if (actualResult.confidence < landmark.thresholds.minConfidence) {
+      landmarkFailures.push("actual detector confidence is below threshold");
+    }
+    landmarkResults.push({
+      contractId: landmark.id,
+      detector: landmark.detector,
+      parameters: landmark.parameters,
+      reference: referenceResult,
+      actual: actualResult,
+      metrics: { deltaPx },
+      thresholds: landmark.thresholds,
+      status: landmarkFailures.length === 0 ? "PASS" : "FAIL",
+      failures: landmarkFailures,
+    });
+  }
+
+  const regionResults = [];
+  for (const region of contract.regions ?? []) {
+    const maskFile = await resolveProjectFile(
+      projectRoot,
+      region.mask?.path,
+      `${region.id} mask`,
+    );
+    const maskHash = await sha256File(maskFile.absolute);
+    if (maskHash !== region.mask?.sha256) fail(`${region.id} mask hash mismatch`);
+    const mask = await loadRegionMask({
+      file: maskFile,
+      height,
+      label: region.id,
+      sharp,
+      width,
+    });
+    const regionMetrics = compareMasked(
+      reference,
+      actual,
+      mask,
+      width,
+      height,
+      region.thresholds.pixelThreshold,
+    );
+    const regionFailures = [];
+    if (regionMetrics.mae > region.thresholds.maxMae) {
+      regionFailures.push(
+        `MAE ${regionMetrics.mae.toFixed(6)} > ${region.thresholds.maxMae}`,
+      );
+    }
+    if (regionMetrics.diffRatio > region.thresholds.maxDiffRatio) {
+      regionFailures.push(
+        `diff ratio ${regionMetrics.diffRatio.toFixed(6)} > ${region.thresholds.maxDiffRatio}`,
+      );
+    }
+    if (regionMetrics.edgeMae > region.thresholds.maxEdgeMae) {
+      regionFailures.push(
+        `edge MAE ${regionMetrics.edgeMae.toFixed(6)} > ${region.thresholds.maxEdgeMae}`,
+      );
+    }
+    regionResults.push({
+      contractId: region.id,
+      mask: region.mask,
+      metrics: regionMetrics,
+      thresholds: region.thresholds,
+      status: regionFailures.length === 0 ? "PASS" : "FAIL",
+      failures: regionFailures,
+    });
+  }
+
+  const geometryFailures = [...landmarkResults, ...regionResults].flatMap((result) =>
+    result.failures.map((failure) => `${result.contractId}: ${failure}`),
+  );
+  return {
+    landmarkResults,
+    regionResults,
+    status: geometryFailures.length === 0 ? "PASS" : "FAIL",
+    failures: geometryFailures,
+  };
+}
+
+async function loadRegionMask({ file, height, label, sharp, width }) {
+  if (file.logical.endsWith(".json")) {
+    let contract;
+    try {
+      contract = JSON.parse(await readFile(file.absolute, "utf8"));
+    } catch {
+      fail(`${label} region-mask JSON is invalid`);
+    }
+    if (
+      contract.schemaVersion !== 1 ||
+      contract.width !== width ||
+      contract.height !== height ||
+      !Array.isArray(contract.rectangles) ||
+      contract.rectangles.length === 0
+    ) {
+      fail(`${label} region-mask contract does not match the capture frame`);
+    }
+    const mask = Buffer.alloc(width * height);
+    for (const rectangle of contract.rectangles) {
+      if (!validMaskRectangle(rectangle, width, height)) {
+        fail(`${label} region-mask rectangle is invalid`);
+      }
+      for (let y = rectangle.y; y < rectangle.y + rectangle.height; y += 1) {
+        mask.fill(
+          255,
+          y * width + rectangle.x,
+          y * width + rectangle.x + rectangle.width,
+        );
+      }
+    }
+    return mask;
+  }
+  const maskImage = sharp(file.absolute).greyscale();
+  const metadata = await maskImage.metadata();
+  if (metadata.width !== width || metadata.height !== height) {
+    fail(`${label} mask dimensions do not match the capture frame`);
+  }
+  return maskImage.raw().toBuffer();
+}
+
+function validMaskRectangle(value, width, height) {
+  return (
+    value != null &&
+    [value.x, value.y, value.width, value.height].every(Number.isInteger) &&
+    value.x >= 0 &&
+    value.y >= 0 &&
+    value.width > 0 &&
+    value.height > 0 &&
+    value.x + value.width <= width &&
+    value.y + value.height <= height
+  );
+}
+
+function compareMasked(reference, actual, mask, width, height, pixelThreshold) {
+  let absolute = 0;
+  let differentPixels = 0;
+  let selectedPixels = 0;
+  let edgeAbsolute = 0;
+  let edgeCount = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const pixel = y * width + x;
+      if (mask[pixel] === 0) continue;
+      const index = pixel * 3;
+      const dr = Math.abs(reference[index] - actual[index]);
+      const dg = Math.abs(reference[index + 1] - actual[index + 1]);
+      const db = Math.abs(reference[index + 2] - actual[index + 2]);
+      absolute += dr + dg + db;
+      selectedPixels += 1;
+      if ((dr + dg + db) / (3 * 255) > pixelThreshold) differentPixels += 1;
+      if (x > 0 && y > 0 && mask[pixel - 1] > 0 && mask[pixel - width] > 0) {
+        const referenceEdge =
+          Math.abs(luminance(reference, index) - luminance(reference, index - 3)) +
+          Math.abs(
+            luminance(reference, index) - luminance(reference, index - width * 3),
+          );
+        const actualEdge =
+          Math.abs(luminance(actual, index) - luminance(actual, index - 3)) +
+          Math.abs(luminance(actual, index) - luminance(actual, index - width * 3));
+        edgeAbsolute += Math.abs(referenceEdge - actualEdge);
+        edgeCount += 1;
+      }
+    }
+  }
+  if (selectedPixels === 0) fail("region mask selects no pixels");
+  return {
+    selectedPixels,
+    mae: absolute / (selectedPixels * 3 * 255),
+    diffRatio: differentPixels / selectedPixels,
+    edgeMae: edgeCount === 0 ? 0 : edgeAbsolute / (edgeCount * 510),
   };
 }
 
@@ -517,6 +779,7 @@ function parseArguments(argv) {
     out: undefined,
     label: undefined,
     frameId: undefined,
+    config: undefined,
     configSha256: undefined,
     pixelThreshold: 0.1,
     maxAspectDelta: 0.01,
@@ -532,6 +795,7 @@ function parseArguments(argv) {
     "out",
     "label",
     "frame-id",
+    "config",
     "config-sha256",
     "pixel-threshold",
     "max-aspect-delta",
@@ -607,6 +871,9 @@ function printHelp() {
   process.stdout.write("  --label NAME            Artifact prefix\n");
   process.stdout.write(
     "  --frame-id ID           Config frame ID for evidence binding\n",
+  );
+  process.stdout.write(
+    "  --config FILE           Execute that frame's geometry contract\n",
   );
   process.stdout.write("  --config-sha256 HASH    Config hash for evidence binding\n");
   process.stdout.write(

@@ -5,6 +5,8 @@ import { resolve } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { settleMenu } from "../support/menu";
+
 // @ts-expect-error The runtime-validated MJS contract intentionally has no public declaration file.
 import * as runContract from "../../scripts/fidelity-run-contract.mjs";
 import {
@@ -56,11 +58,16 @@ interface FidelityFrame {
   readonly route: string;
   readonly scroll: { readonly x: number; readonly y: number } | null;
   readonly semanticObservation: SemanticObservationContract;
-  readonly state: { readonly id: string; readonly setup: "none" };
+  readonly state: {
+    readonly control?: string;
+    readonly id: string;
+    readonly setup: "none" | "open-menu";
+  };
   readonly viewport: { readonly height: number; readonly width: number };
 }
 
 interface FidelityConfig {
+  readonly foundationOnly: boolean;
   readonly captureArtifacts: {
     readonly runManifestFile: "capture-run-manifest.json";
     readonly runsRoot: "artifacts/fidelity/captures/runs";
@@ -144,15 +151,14 @@ for (const frame of config.frames) {
     await page.emulateMedia({ reducedMotion: "reduce" });
     const response = await page.goto(frame.route, { waitUntil: "networkidle" });
     expect(response?.status()).toBe(200);
+    if (frame.state.setup === "open-menu") {
+      const control = page.locator(frame.state.control ?? "");
+      expect(await control.count()).toBe(1);
+      await control.click();
+      await settleMenu(page);
+    }
     await page.locator(frame.readiness.selector).waitFor({ state: "visible" });
-    await page.evaluate(async () => {
-      await document.fonts.ready;
-      await Promise.all(
-        [...document.images].map((image) =>
-          image.complete ? image.decode().catch(() => undefined) : image.decode(),
-        ),
-      );
-    });
+    await page.evaluate(() => document.fonts.ready);
     await page.addStyleTag({
       content:
         "*,*::before,*::after{animation:none!important;caret-color:transparent!important;transition:none!important}",
@@ -161,6 +167,18 @@ for (const frame of config.frames) {
     const semanticObservationResult = await executeSemanticObservation(page, frame);
     expect(semanticObservationResult.failures).toEqual([]);
     expect(semanticObservationResult.status).toBe("PASS");
+    await page.evaluate(async () => {
+      const viewportImages = [...document.images].filter((image) => {
+        const bounds = image.getBoundingClientRect();
+        return (
+          bounds.bottom > 0 &&
+          bounds.right > 0 &&
+          bounds.top < window.innerHeight &&
+          bounds.left < window.innerWidth
+        );
+      });
+      await Promise.all(viewportImages.map((image) => image.decode()));
+    });
 
     const screenshot = await page.screenshot({
       animations: "disabled",
@@ -386,6 +404,11 @@ async function executeSemanticObservation(
 function validateCaptureConfig(config: FidelityConfig): void {
   const failures: string[] = [];
   if (config.schemaVersion !== 2) failures.push("schemaVersion must equal 2");
+  if (config.foundationOnly !== false) {
+    failures.push(
+      "external-reference capture is blocked while foundationOnly=true; implement the approved production DOM and set foundationOnly=false before capture",
+    );
+  }
   if (
     JSON.stringify(config.captureEnvironment) !==
     JSON.stringify({
@@ -428,8 +451,15 @@ function validateCaptureConfig(config: FidelityConfig): void {
     ) {
       failures.push(`${frame.id} viewport is invalid`);
     }
-    if (frame.state?.setup !== "none")
+    if (!["none", "open-menu"].includes(frame.state?.setup)) {
       failures.push(`${frame.id} setup is unsupported`);
+    }
+    if (
+      frame.state?.setup === "open-menu" &&
+      !validSelector(frame.state.control ?? "")
+    ) {
+      failures.push(`${frame.id} open-menu control is invalid`);
+    }
     if (
       frame.readiness?.images !== "decode" ||
       !validSelector(frame.readiness.selector)

@@ -5,7 +5,7 @@ Authority: technical evidence only; never deployment or release authorization
 
 ## Gate order
 
-`pnpm verify:technical-candidate` runs the foundation gates, deterministic capture,
+`pnpm verify:technical-candidate` runs the baseline technical gates, deterministic capture,
 comparison/evidence generation, and then `candidate:preflight`. The final preflight must
 inspect already-produced evidence; configuration declarations cannot pass the gate.
 
@@ -19,8 +19,8 @@ coverage matrix:
 
 - desktop top/menu closed at 1440×900;
 - desktop ROOT, DUSK, DAWN, ALPINE, and footer frames;
-- tablet top/menu closed at 768×1024;
-- mobile top/menu closed at 390×844;
+- tablet top, ROOT, DUSK, DAWN, ALPINE, and footer frames at 768×1024;
+- mobile top, ROOT, DUSK, DAWN, ALPINE, and footer frames at 390×844;
 - menu open at all three viewports.
 
 Every label must be a unique safe basename. Every frame binds route, state, viewport,
@@ -52,7 +52,7 @@ unchanged in the current clean revision. An unsigned record, an identity string,
 non-verified signature string, an untracked key, or an automation-authored assertion
 cannot unlock the gate.
 
-No trusted signer is enrolled in the current foundation. This intentionally keeps the
+No trusted signer is enrolled in the current repository. This intentionally keeps the
 technical candidate blocked. Enrolling or rotating a signer requires protected human
 review of the tracked signer policy; private signing keys never enter this repository.
 
@@ -101,9 +101,10 @@ reuse is disabled, command is exactly `corepack pnpm start:test`, origin is exac
 `http://127.0.0.1:4173`, and the sidecar records a nonempty PID limitation statement.
 The gate never fabricates a PID.
 
-Current comparison evidence is intentionally `UNAVAILABLE` because executable
-detectors and approved masks do not exist. It cannot be promoted to PASS by changing a
-declarative status.
+Current comparison evidence is intentionally `UNAVAILABLE`. Executable symmetric
+detectors, synthetic region masks, selectors, anchors, and thresholds now exist, but
+the approved exact-frame references and current-build comparisons do not. The local
+production DOM alone cannot promote evidence to PASS by changing a declarative status.
 
 ## Public-repository policy
 
@@ -115,9 +116,13 @@ and scans text for secret signatures, workstation paths, private raw identifiers
 contact patterns, and unusually large encoded payloads.
 
 Only enumerated roots and file types are accepted. Binary files require an exact path
-and SHA-256 allowlist entry. The current binary exception is restricted in code to
-synthetic foundation PNG regression baselines under the test-snapshot root; it does not
-authorize client production assets.
+and SHA-256 allowlist entry. Production binaries are admitted through two explicit
+classes: exact path/hash/media-type `approved-production-asset` entries for the 51
+code-owned SVG, WebP, and WOFF2 derivatives, and `approved-production-baseline` entries
+for the 21 viewport regression PNGs. These baselines contain approved client
+photography/copy and are never classified as synthetic. The public copy detector stays
+active; only the two exact footer values in `config/public-copy-allowlist.json` are
+exempted by source-path and SHA-256 binding.
 
 Automated scanning has semantic limits. It cannot prove that arbitrary prose is public,
 prove copyright or model/property releases, recognize every obfuscation/encoding, or
@@ -128,12 +133,14 @@ follow-up.
 
 ## Current blockers
 
-- no CI evidence for local code-only baseline commit `c78be61`;
-- no trusted approval signer or valid signed reference manifest;
-- no approved clean exact-frame PC/tablet/mobile/menu references;
-- no concrete chapter/footer/menu-open frame matrix;
-- no approved chapter/footer/modal selectors, selector anchors, or expected DOM states;
-- no executable detector or approved mask contracts/results;
-- no current-build aggregate evidence with every frame and coverage result passing.
+- no trusted approval signer or valid detached-signature reference manifest;
+- no approved clean exact-frame desktop/tablet/mobile/menu reference set;
+- no immutable production capture run or current-build comparison aggregate with every
+  frame and coverage result passing;
+- public-repository policy now passes for the complete candidate worktree; staged policy
+  verification, rights review, and the no-stage/no-publish boundary remain required;
+- no CI-run evidence or named human/assistive-technology approval.
 
-Gate C and Gate E remain blocked.
+Gate C is ready. Gate D contains a local candidate but remains blocked, and Gate E remains
+blocked. Local three-engine execution and the production-candidate manual WCAG record do
+not substitute for approved reference/diff/signature, public-policy, CI, or human evidence.

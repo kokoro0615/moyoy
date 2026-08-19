@@ -1,0 +1,228 @@
+# Clone workflow ledger
+
+Opened 2026-08-19 for the scroll-behaviour work on the MOYOY landing page.
+
+## Mode and scope
+
+- **Operating mode:** authorized client rebuild, already in progress in this repository.
+  The current task is an existing-product defect fix, not a new clone.
+- **Production owner:** the main conversation. Observation, extraction, implementation and
+  target-vs-local comparison stay with one owner.
+- **In scope:** the scroll-linked behaviour of `/` — DA-MOTION-01, DA-MOTION-02 and
+  DA-MEDIA-01 — plus the loading strategy for the chapter photography.
+- **Out of scope:** copy, information architecture, routes, the menu, the footer contract,
+  the NEWS deferral, and every unresolved question already recorded in
+  `docs/open-questions.md`.
+
+## Target and rights
+
+| Item | Record |
+| --- | --- |
+| Behavioural reference | `https://apple-q.jp/` — named by DA-MEDIA-01 in `docs/design-annotation-ledger.md` as the intended fixed-background behaviour |
+| Reference use | read-only observation of public pages at `1440 × 900` on 2026-08-19; computed styles and DOM structure only |
+| Access controls | none bypassed; no authentication, paywall, robots restriction or rate limit touched |
+| Assets taken from the reference | **none.** No image, font, script, stylesheet, copy or markup was copied |
+| What was taken | one architectural fact: the reference pins a `position: fixed` layer at `z-index: -1` and runs no scroll listener. Recorded in `docs/scroll-motion-spec.md` §1 |
+| Production identity | MOYOY only. Nothing on the page references or resembles the reference operator |
+| MOYOY assets | client-confirmed paid web-use permission, already recorded in `docs/asset-provenance.csv` |
+
+The reference grants a behavioural target and no licence. No third-party identity, trade
+dress or media enters production output.
+
+## Functional invariants preserved
+
+Verified by the existing suites after the change:
+
+- routes, static export, metadata, `robots.txt`;
+- heading order, landmarks, reading order, and every accessible name;
+- the menu dialog contract — focus entry, trap, Escape, focus return, scroll restore;
+- chapter anchors `#root`, `#dusk`, `#dawn`, `#alpine` and `#products`, `#hero`;
+- the approved copy in `src/lib/moyoy-content.ts`, unchanged;
+- `prefers-reduced-motion: reduce` producing a static composition with no content,
+  visibility or reading-order dependency on any transform;
+- no layout shift, no horizontal overflow, and reflow at 200 % and 400 %;
+- the fidelity capture contract's 21 frames and three coverage groups.
+
+## Active specification
+
+`docs/scroll-motion-spec.md` — measured reference technique, defect diagnosis, the `zoom`
+decision with its three-engine evidence, the plate and pan model, contour depths and caps,
+the drive model, reduced-motion behaviour, and predeclared acceptance criteria.
+
+## Asset provenance
+
+- New files: 18 contour layer SVGs derived from the six approved contour exports by
+  `scripts/generate-contour-layers.mjs`. Same owner, same licence, same permission as their
+  sources; regenerated into `docs/asset-provenance.csv` and
+  `config/public-binary-allowlist.json`.
+- Verified: stacking the split layers reproduces each source drawing with zero differing
+  pixels.
+- No asset was downloaded from the behavioural reference.
+
+## State and viewport matrix
+
+Compared at identical route, locale, theme, data and animation policy.
+
+| Viewport | States checked |
+| --- | --- |
+| `1440 × 900` | top, ROOT, DUSK, DAWN, ALPINE, footer, menu-open, reduced motion, wheel-driven scroll sweep |
+| `768 × 1024` | top, ROOT, DUSK, DAWN, ALPINE, footer, menu-open, reduced motion |
+| `390 × 844` | top, ROOT, DUSK, DAWN, ALPINE, footer, menu-open, reduced motion |
+| `1200 × 900` | motion contract checks (contour depths, object drift, plate, pan) |
+| `2560 × 1440` | full-bleed artwork and derivative selection |
+
+Engines: Chromium 151, Firefox 153, WebKit 26.5.
+
+## Unresolved differences
+
+| Item | State |
+| --- | --- |
+| Reference fidelity gate (`pnpm test:fidelity`) | **BLOCKED, pre-existing.** The evidence contract is `unavailable` and no exact-frame reference is approved. Unchanged by this work |
+| `pnpm candidate:preflight` | **BLOCKED, pre-existing**, for the same approval reason |
+| Reveal extent of the chapter pan | implementation decision; a full traverse answers the reported defect, and the strength constant lets the owner dial it back |
+| Contour depths and caps | tuned to be perceptible; owner confirmation of amplitude pending |
+| Type rasterisation at desktop widths | changed by `zoom`: glyphs and `0.25px` strokes now render at their true size instead of being upscaled from a `1×` raster. Geometry and photography are unchanged; the `1440 × 900` regression baselines were re-recorded, and `768 × 1024` and `390 × 844` were untouched |
+
+## Claim rule
+
+This work is a measured defect correction with local three-engine evidence. It does not
+close Gate D or Gate E, does not authorize deployment, and does not constitute human visual
+approval.
+
+## 2026-08-20 session — mobile fidelity, line weight, motion amplitude, drawer motion
+
+- **Mode:** unchanged (authorized client rebuild; existing-product defect fix).
+- **Production owner:** unchanged — the main conversation holds observation, extraction,
+  implementation and target-vs-local comparison.
+- **In scope:** four owner-reported defects — the SP about block (VF-29), the SP footer
+  mark and contact block (VF-30), contour line weight and parallax amplitude
+  (VF-28 / VF-31), and the menu drawer's open/close behaviour (VF-32) — plus the SP
+  product section (VF-33), found while measuring the about block and corrected in the
+  same pass.
+- **Out of scope, unchanged:** approved copy, information architecture, routes, the NEWS
+  deferral (Q-02), the footer policy links (DA-FOOTER-01), the Instagram mark (VF-12),
+  and every open question already recorded in `docs/open-questions.md`.
+
+### Reference and rights
+
+No new target site was visited and no asset was downloaded. All measurement came from
+material already in the repository: the approved `375 × 7067` and `1200 × 10326` frames,
+the `375 × 844` / `1200 × 900` menu-open exports, and the private Illustrator outline
+masters. No third-party identity entered production output; the Instagram mark remains
+unshipped.
+
+### Assets touched
+
+The six approved contour exports and their 18 generated layers changed one rendered CSS
+declaration each (`stroke-width: .25px` → `1px` plus `vector-effect: non-scaling-stroke`).
+Path geometry, `viewBox`, and every other attribute are unchanged, so the layers still
+restack to the source drawing. `docs/asset-provenance.csv` and
+`config/public-binary-allowlist.json` were regenerated from the files on disk.
+
+### Comparison performed
+
+Target-vs-local at `375` (full paper regions, reduced motion so no scroll transform is in
+the frame) and at `1200` (contour statistic). Regression baselines at `1440 × 900`,
+`768 × 1024` and `390 × 844` were re-recorded after the corrections and re-verified.
+Menu motion was inspected at 150 ms, 350 ms and settled, plus the closing frame, on
+Chromium at `1440 × 900` and `390 × 844`.
+
+### Still unresolved after this session
+
+| Item | State |
+| --- | --- |
+| `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged.** No approved immutable exact-frame reference exists for any of the 21 frames |
+| Motion amplitude (VF-31) and drawer timing (VF-32) | measurable implementation judgment; owner confirmation pending |
+| Instagram mark in the footer and drawer | third-party mark, no rights path recorded; stays unshipped |
+| SP residuals of 1–6 px on product copy rows | fallback font metrics, not geometry; resolves when the Adobe Fonts kit is live |
+
+## 2026-08-20 session — first view, line hierarchy, SP scale, control legibility, motion
+
+- **Mode:** unchanged (authorized client rebuild; existing-product defect fix).
+- **Production owner:** unchanged — the main conversation holds observation, extraction,
+  implementation and target-vs-local comparison.
+- **In scope:** six owner-reported defects — the PC first-view scroll cue (VF-36), the
+  product drawing line weight (VF-37), the SP scroll-cue centring and the SP prose
+  position against the background artwork (both VF-34), motion amplitude (VF-31b) and
+  drawer timing (VF-32b), and the fixed menu control disappearing over photography
+  (VF-35).
+- **Out of scope, unchanged:** approved copy, information architecture, routes, the NEWS
+  deferral (Q-02), the footer policy links (DA-FOOTER-01), the Instagram mark (VF-12),
+  the tablet band's bespoke reflow, and every open question already in
+  `docs/open-questions.md`.
+
+### Reference and rights
+
+No new target site was visited and no asset was downloaded. All measurement came from
+material already in the repository: the approved `375 × 7067` and `1200 × 10326` frames,
+and — for the first time — the **guide layer of the supplied source document**, read
+directly from its content streams to recover the two first-view frames the owner's report
+refers to. That measurement produced two numbers (PC first view 1200 × 800, SP first view
+375 × 667) and nothing else; no guide mark, label or bracket enters production output.
+No third-party identity is involved.
+
+### Assets touched
+
+The three approved product drawings changed rendered CSS declarations only: the outline
+class moved to `stroke-width: 1px` with `vector-effect: non-scaling-stroke`, and the
+signature accent path — which shipped with no presentation attribute at all — was given
+an explicit fill and hairline stroke. Path geometry, `viewBox` and every other attribute
+are unchanged. `docs/asset-provenance.csv` and `config/public-binary-allowlist.json` were
+regenerated from the files on disk and `pnpm policy:public` re-verified.
+
+### Comparison performed
+
+Target-vs-local at the authored `1200` and `375` canvases for the product band, the
+contour bands and the SP about block. The SP correction was additionally verified by
+rendering at `390` and downscaling to `375` before comparing with the approved frame, so
+that "the composition is a pure scale of the approved canvas" is measured rather than
+asserted. Geometry was measured at eleven widths from `320` to `2560`. The menu control
+was inspected over all four chapters at `1440` and `390`. Drawer motion was inspected at
+120 / 300 / 520 / 900 ms on Chromium at `1440 × 900`.
+
+### Still unresolved after this session
+
+| Item | State |
+| --- | --- |
+| `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged.** No approved immutable exact-frame reference exists for any of the 21 frames |
+| Contour line weight | production is ~4× the master's 0.25 px hairline. Kept because the owner rejected the faithful weight twice; recorded as an intentional deviation with a measured alternative in `docs/visual-fidelity-defects.md` |
+| Motion amplitude (VF-31b) and drawer timing (VF-32b) | measurable implementation judgment; owner confirmation pending |
+| Product accent mark x-position | production sits about 2 px left of the reference; pre-existing in the approved export, not raised by the owner, not changed here |
+| Instagram mark in the footer and drawer | third-party mark, no rights path recorded; stays unshipped |
+| SP residuals of 1–6 px on product copy rows | fallback font metrics, not geometry; resolves when the Adobe Fonts kit is live |
+
+## 2026-08-20 second session — control treatment and parallax coverage
+
+- **Mode:** unchanged (authorized client rebuild; existing-product defect fix).
+- **Production owner:** unchanged — the main conversation.
+- **In scope:** two owner-reported defects — the paper plate behind the fixed menu control
+  (VF-35b) and the coverage of the scroll offset across the line system (VF-38).
+- **Out of scope, unchanged:** approved copy, information architecture, routes, the NEWS
+  deferral, the footer policy links, the Instagram mark, the tablet band's bespoke reflow,
+  and the contour line-weight deviation recorded in the previous session.
+
+### Reference and rights
+
+No new target site was visited and no asset was downloaded. No production asset changed at
+all this session: the corrections are CSS and the scroll controller. Measurement came from
+the repository's own build, from the eight chapter mask files, and from the six approved
+contour exports.
+
+### Comparison performed
+
+Rendered-transform audit of every decorative element at nine scroll positions
+(1440 × 900); per-layer path geometry measured from the six contour exports; backdrop
+luminance behind the control sampled with the control hidden at ten scroll positions per
+chapter, at 1440 × 900 and 390 × 844; mask opacity measured in the control's corner strip
+for all eight mask files; the paper-to-photograph transition located to within the
+control's own height.
+
+### Still unresolved after this session
+
+| Item | State |
+| --- | --- |
+| `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
+| Contour line weight | still ~4× the master's 0.25 px hairline, by owner decision; unchanged this session |
+| Motion amplitude and drawer timing | owner confirmation still pending |
+| Chapter type (title, prose) has no relative offset | the chapters hold the photograph, its pan and one drawing; adding a third plane to the type is available but was not done, because the report was about background lines |
+| Instagram mark, SP product copy residuals | unchanged |

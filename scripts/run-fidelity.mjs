@@ -135,6 +135,8 @@ for (const frame of config.frames) {
       frame.label,
       "--frame-id",
       frame.id,
+      "--config",
+      "fidelity.config.json",
       "--config-sha256",
       configSha256,
       "--out",

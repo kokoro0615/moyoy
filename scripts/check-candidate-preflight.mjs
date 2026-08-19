@@ -15,6 +15,7 @@ import {
 import {
   ACTUAL_ROOT,
   DETECTOR_ROOT,
+  MASK_ROOT,
   REFERENCE_ROOT,
   REQUIRED_COVERAGE,
   validateCaptureRunEvidence,
@@ -331,8 +332,10 @@ async function validateFileHash(
   let path;
   try {
     path = normalizeRelativePath(contract?.path, `${label} path`);
-    if (!pathIsWithin(path, expectedRoot))
-      errors.push(`${label} path is outside ${expectedRoot}`);
+    const expectedRoots = Array.isArray(expectedRoot) ? expectedRoot : [expectedRoot];
+    if (!expectedRoots.some((candidate) => pathIsWithin(path, candidate))) {
+      errors.push(`${label} path is outside ${expectedRoots.join(" or ")}`);
+    }
   } catch (error) {
     errors.push(error.message);
     return;
@@ -342,6 +345,37 @@ async function validateFileHash(
   if ((await sha256File(resolve(root, path))) !== contract.sha256)
     errors.push(`${label} SHA-256 changed`);
   if (dimensions) {
+    if (path.endsWith(".json")) {
+      try {
+        const mask = JSON.parse(await readFile(resolve(root, path), "utf8"));
+        if (
+          mask.schemaVersion !== 1 ||
+          contract.width !== dimensions.width ||
+          contract.height !== dimensions.height ||
+          mask.width !== dimensions.width ||
+          mask.height !== dimensions.height ||
+          !Array.isArray(mask.rectangles) ||
+          mask.rectangles.length === 0 ||
+          mask.rectangles.some(
+            (rectangle) =>
+              ![rectangle?.x, rectangle?.y, rectangle?.width, rectangle?.height].every(
+                Number.isInteger,
+              ) ||
+              rectangle.x < 0 ||
+              rectangle.y < 0 ||
+              rectangle.width <= 0 ||
+              rectangle.height <= 0 ||
+              rectangle.x + rectangle.width > dimensions.width ||
+              rectangle.y + rectangle.height > dimensions.height,
+          )
+        ) {
+          errors.push(`${label} dimensions do not match exact viewport`);
+        }
+      } catch {
+        errors.push(`${label} is not a readable region-mask contract`);
+      }
+      return;
+    }
     try {
       const metadata = await sharp(resolve(root, path)).metadata();
       if (
@@ -824,12 +858,20 @@ export async function validateCandidatePreflight(root = process.cwd()) {
       );
     }
     for (const region of frame.geometryContract?.regions ?? []) {
+      if (pathIsWithin(region.mask?.path ?? "", MASK_ROOT)) {
+        await assertTrackedAtHead(
+          root,
+          region.mask?.path,
+          errors,
+          `${frame.id}/${region.id} mask`,
+        );
+      }
       await validateFileHash(
         root,
         region.mask,
         errors,
         `${frame.id}/${region.id} mask`,
-        REFERENCE_ROOT,
+        [REFERENCE_ROOT, MASK_ROOT],
         frame.viewport,
       );
     }

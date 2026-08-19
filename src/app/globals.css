@@ -1,11 +1,79 @@
 @import "tailwindcss";
 
 :root {
-  color: #0f172a;
-  background: #f8fafc;
-  font-family: Arial, "Helvetica Neue", sans-serif;
+  --paper: #ece7d8;
+  --ink: #11120f;
+  --olive-aa: #68702f;
+  /* DA-ASSET-01 names Futura PT and 秀英角ゴシック銀 Std and the source supplies the
+     Adobe Fonts kit that delivers them (see src/app/layout.tsx). The Latin web family
+     slug is stable; the Japanese slug must be confirmed against the kit stylesheet once
+     the deploy domain is registered, so both candidate names are listed. The measured
+     local subsets stay in the stack as the metric-compatible fallback. */
+  --latin: "futura-pt", "MOYOY Jost", "MOYOY Latin fallback", sans-serif;
+  --japanese:
+    "dnp-shuei-gothic-gin-std", "DNP 秀英角ゴシック銀 Std", "MOYOY Noto Sans JP",
+    "MOYOY Japanese fallback", sans-serif;
+
+  /* One motion vocabulary for the whole page. Every authored transition names one of
+     these; no component invents its own curve. */
+  --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-ui: 180ms;
+  /* VF-32, second pass. Owner review after the first: the drawer still resolved too
+     quickly to register as a movement. Both halves are lengthened and the entry travel
+     of each group is nearly doubled (14 → 26 px), because at this panel width the
+     distance is what reads, not the clock. The panel itself still arrives in 640 ms and
+     every item is focusable while its group settles, so nothing waits on the
+     choreography. */
+  --dur-menu-enter: 640ms;
+  --dur-menu-exit: 420ms;
+  --menu-stagger: 52ms;
+  --menu-settle-delay: 150ms;
+  --menu-item-travel: 26px;
+
+  color: var(--ink);
+  background: #d8d5cc;
+  font-family: var(--japanese);
+  font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+/* Licensed OFL 1.1 delivery; production subsets recorded in docs/asset-provenance.csv. */
+@font-face {
+  font-family: "MOYOY Jost";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/assets/moyoy-candidate/font/moyoy-jost-subset.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "MOYOY Noto Sans JP";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/assets/moyoy-candidate/font/moyoy-noto-sans-jp-subset.woff2")
+    format("woff2");
+}
+
+@font-face {
+  font-family: "MOYOY Latin fallback";
+  src: local("Liberation Sans");
+  size-adjust: 91.04%;
+  ascent-override: 107%;
+  descent-override: 38%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "MOYOY Japanese fallback";
+  src: local("IPAPGothic");
+  size-adjust: 111.93%;
+  ascent-override: 116%;
+  descent-override: 29%;
+  line-gap-override: 0%;
 }
 
 * {
@@ -14,21 +82,1641 @@
 
 html {
   min-width: 320px;
-  background: #f8fafc;
+  overflow-x: clip;
+  background: #d8d5cc;
 }
 
 body {
   min-height: 100dvh;
   margin: 0;
-  background: #f8fafc;
+  overflow-x: clip;
+  background: #d8d5cc;
+}
+
+body.menu-locked {
+  position: fixed;
+  inset-inline: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
 }
 
 ::selection {
-  color: #f8fafc;
-  background: #0f172a;
+  color: var(--paper);
+  background: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
+[data-app-shell] {
+  --desktop-scale: 1;
+
+  /* DA-GUIDE-PC-FV. The pink guide frames the PC first view as 1200 × 800 (a 3 : 2
+     window) and DA-GUIDE-SP-FV frames the SP first view as 375 × 667. The artboard is
+     resolved against viewport *width*, so at any window that is not 3 : 2 the authored
+     800 px band is not the window: at 1440 × 900 it renders 960 px tall and the last
+     60 px — the whole scroll rule — falls below the fold. This is the window measured
+     in artboard units, so anything the guide pins to the first-view edge can follow the
+     real fold instead of the authored one. Viewport units ignore `zoom`, so the divide
+     converts them into the artboard's own coordinate system. */
+  --first-view-height: calc(100dvh / var(--desktop-scale));
+}
+
+.page-canvas {
+  position: relative;
+  width: 100%;
+  overflow: clip;
+  background: var(--paper);
+}
+
+.page-artboard {
+  position: relative;
+  width: min(1200px, 100%);
+  height: 9436px;
+  margin-inline: auto;
+}
+
+@media (width >= 1200px) {
+  [data-app-shell] {
+    /* Resolve the authored 1200 px canvas against the CSS viewport before React
+       hydrates. tan(atan2()) converts the two lengths into a dimensionless ratio in
+       Chromium, Firefox and WebKit without a JavaScript-owned layout fallback. */
+    --desktop-scale: tan(atan2(100vw, 1200px));
+  }
+
+  /* `zoom` rather than `transform: scale()`. Both resolve the 1200 px canvas against the
+     viewport identically (verified in Chromium 151, Firefox 153 and WebKit 26.5), but a
+     transformed ancestor becomes the containing block for `position: fixed` descendants,
+     which is what forced DA-MEDIA-01 to be emulated from a scroll listener. Under `zoom`
+     the chapter plate can be a real viewport-fixed layer, so the browser owns the pin. */
+  .page-artboard {
+    width: 1200px;
+    zoom: var(--desktop-scale);
+  }
+}
+
+main[data-page="moyoy-lp"] {
+  position: absolute;
+  inset: 0;
+}
+
+.intro {
+  position: absolute;
+  z-index: 10;
+  inset: 0 0 auto;
+  height: 2423px;
+  overflow: visible;
+}
+
+.decorative,
+.brand,
+.root-foreground {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+/* DA-MOTION-02 / DA-MOTION-01. The drawing is stacked from one file per contour path so
+   each line can hold its own scroll depth. Every layer shares the container box, so the
+   stack is identical to the unsplit export whenever the offsets are zero. */
+.contour-stack {
+  isolation: isolate;
+}
+
+.contour-layer {
+  --contour-parallax-x: 0px;
+  --contour-parallax-y: 0px;
+
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform: translate3d(var(--contour-parallax-x), var(--contour-parallax-y), 0);
+}
+
+.contour-layer img {
+  width: 100%;
+  height: auto;
+}
+
+.hero-contours {
+  z-index: 0;
+  top: -17.47px;
+  left: -74.14px;
+  width: 1287.14px;
+  aspect-ratio: 1287.14 / 1344.45;
+}
+
+/* VF-38. The two brand rules are the longest lines on the page and were the only line
+   artwork with no scroll offset at all. Both now drift like the rest of the line system;
+   each is anchored so the frame the reference approves is the frame that holds still. */
+.brand-header,
+.brand-footer {
+  --object-parallax-y: 0px;
+
+  transform: translate3d(0, var(--object-parallax-y), 0);
+}
+
+.brand-header {
+  z-index: 2;
+  top: 385.8px;
+  left: -238.5px;
+  width: 917px;
+}
+
+.brand-header img,
+.brand-center img,
+.brand-footer img,
+.root-foreground img {
+  width: 100%;
+  height: auto;
+}
+
+/* The guide places the block flush with the bottom of the first view: PC block top
+   735.8 against an 800 px frame, SP block top 602.8 against a 667 px frame — the same
+   64.2 px clearance in both, leaving 0.75 px under the 63.45 px block.
+   The authored offset is kept wherever the window can show it, so every frame that fits
+   still matches the approved reference exactly. It only rises — never falls — when the
+   window is shorter than the authored first view, which is the case the artboard's
+   width-driven scale creates: at 1440 × 900 the authored band renders 960 px tall and
+   the whole rule used to start at the fold. `max()` holds a 19 px gap under the brand
+   rule, which ends at 400.8; below roughly a 2.4 : 1 window the gap wins and the block
+   reaches the fold edge. */
+.scroll-indicator {
+  position: absolute;
+  z-index: 2;
+  top: max(420px, min(735.8px, calc(var(--first-view-height) - 64.2px)));
+  left: 585.9px;
+  width: 26.64px;
+  height: 63.45px;
+  margin: 0;
+}
+
+.scroll-indicator small {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-family: var(--latin);
+  font-size: 11.2px;
+  font-weight: 500;
+  line-height: 11px;
+  letter-spacing: 0;
+}
+
+.scroll-indicator-line {
+  position: absolute;
+  top: 14.5px;
+  left: 13.1px;
+  width: 1px;
+  height: 48.95px;
+  background: currentColor;
+  transform-origin: top center;
+  animation: moyoy-scroll-line 3.2s linear infinite;
+}
+
+.scroll-indicator[data-motion-visible="false"] .scroll-indicator-line {
+  animation-play-state: paused;
+}
+
+@keyframes moyoy-scroll-line {
+  0% {
+    transform: scaleY(0);
+    transform-origin: top center;
+  }
+
+  6% {
+    transform: scaleY(0);
+    transform-origin: top center;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  48% {
+    transform: scaleY(1);
+    transform-origin: top center;
+  }
+
+  62% {
+    transform: scaleY(1);
+    transform-origin: bottom center;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  96%,
+  100% {
+    transform: scaleY(0);
+    transform-origin: bottom center;
+  }
+}
+
+.about-copy {
+  position: absolute;
+  z-index: 3;
+  top: 1005px;
+  left: 378px;
+  display: flex;
+  gap: 102px;
+  align-items: flex-start;
+  color: var(--ink);
+}
+
+.about-copy h1 {
+  margin: 0;
+  font-family: var(--japanese);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 30px;
+  letter-spacing: 8px;
+  writing-mode: vertical-rl;
+}
+
+.about-copy p {
+  margin: 0;
+  font-family: var(--japanese);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 40px;
+  letter-spacing: 2px;
+  writing-mode: vertical-rl;
+}
+
+.about-copy p span,
+.chapter-prose span {
+  display: block;
+}
+
+.brand-center {
+  --object-parallax-y: 0px;
+
+  z-index: 2;
+  top: 1396px;
+  left: 469px;
+  width: 261px;
+  transform: translate3d(0, var(--object-parallax-y), 0);
+}
+
+.products {
+  position: absolute;
+  z-index: 3;
+  top: 1585px;
+  left: 333px;
+  display: grid;
+  width: 539.25px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+}
+
+.product {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 245px auto;
+  justify-items: center;
+  margin: 0;
+}
+
+.product-drawing {
+  display: flex;
+  width: 100%;
+  height: 245px;
+  align-items: end;
+  justify-content: center;
+}
+
+.product-drawing img {
+  --object-parallax-y: 0px;
+
+  max-width: none;
+  transform: translate3d(0, var(--object-parallax-y), 0);
+}
+
+/* Natural viewBox sizes; the reference draws each product at 1 CSS px per millimetre. */
+.product-perfume-15 .product-drawing img {
+  width: 30.43px;
+  height: 108.03px;
+}
+
+.product-perfume-50 .product-drawing img {
+  width: 62.14px;
+  height: 86.36px;
+}
+
+.product-diffuser-500 .product-drawing img {
+  width: 136.09px;
+  height: 244.97px;
+}
+
+.product-copy {
+  width: 100%;
+  padding-top: 33px;
+  font-family: var(--latin), var(--japanese);
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: 1.2px;
+  text-align: center;
+}
+
+.product-copy h2,
+.product-copy p {
+  margin: 0 0 5px;
+}
+
+.product-copy h2 {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 1px;
+}
+
+.product-contours {
+  z-index: 1;
+  top: 1848px;
+  left: -14px;
+  width: 1227px;
+  aspect-ratio: 1227.05 / 442.91;
+}
+
+.root-foreground {
+  z-index: 20;
+  top: 2136px;
+  left: 0;
+  width: 1200px;
+}
+
+.chapter {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  color: #fff;
+}
+
+/* `--chapter-tone` is the measured mean colour of each approved photograph; it backs the
+   fixed plate so an undecoded frame still reads as the chapter. */
+.chapter-root {
+  --chapter-tone: #12281d;
+
+  z-index: 9;
+  top: 2295px;
+  height: 1812px;
+}
+
+.chapter-dusk {
+  --chapter-tone: #6b442c;
+
+  z-index: 8;
+  top: 3895px;
+  height: 1816.5px;
+}
+
+.chapter-dawn {
+  --chapter-tone: #42633e;
+
+  z-index: 7;
+  top: 5495px;
+  height: 1851px;
+}
+
+.chapter-alpine {
+  --chapter-tone: #779fa4;
+
+  z-index: 6;
+  top: 7095px;
+  height: 1820.5px;
+}
+
+/* The chapter silhouette is drawn by a lightweight alpha-only mask, so CSS never
+   discovers a second copy of the photograph merely to draw its boundary. The mask also
+   clips the fixed plate inside, which is how the moving window is built. */
+.chapter-photo {
+  position: absolute;
+  z-index: 0;
+  display: block;
+  inset: 0;
+  width: 100%;
+  -webkit-mask-position: center top;
+  mask-position: center top;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-mode: alpha;
+  mask-repeat: no-repeat;
+  mask-size: 100% 100%;
+}
+
+/* DA-MEDIA-01 「背景写真は固定（スクロールしない）」. A real viewport-fixed plate, the
+   same technique the cited reference uses. The masked parent above is the window that
+   travels; this plate never moves, so the pin is compositor-owned and cannot judder.
+   The tone behind it is the photograph's own mean colour, so a frame that has not
+   decoded yet still reads as the chapter instead of as a hole. */
+.chapter-photo-pin {
+  position: fixed;
+  inset: 0;
+  overflow: clip;
+  background: var(--chapter-tone, var(--ink));
+}
+
+.chapter-photo-pin picture {
+  display: contents;
+}
+
+/* The approved photographs are authored at full chapter height, so at every desktop
+   viewport the frame is taller than the plate. `--chapter-pan-y` is a percentage of the
+   photograph's own height, which makes it immune to the artboard zoom, and it traverses
+   the hidden remainder once while the chapter is on screen. The drift is roughly
+   0.4 px per scrolled pixel, so a frame of main-thread latency is imperceptible — unlike
+   the 1 : 1 counter-scroll it replaces. */
+.chapter-photo-pin img {
+  --chapter-pan-y: 0%;
+
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  transform: translate3d(0, var(--chapter-pan-y), 0);
+}
+
+.chapter-root .chapter-photo {
+  -webkit-mask-image: url("/assets/moyoy-candidate/mask/mask-pc-root.webp");
+  mask-image: url("/assets/moyoy-candidate/mask/mask-pc-root.webp");
+}
+
+.chapter-dusk .chapter-photo {
+  -webkit-mask-image: url("/assets/moyoy-candidate/mask/mask-pc-dusk.webp");
+  mask-image: url("/assets/moyoy-candidate/mask/mask-pc-dusk.webp");
+}
+
+.chapter-dawn .chapter-photo {
+  -webkit-mask-image: url("/assets/moyoy-candidate/mask/mask-pc-dawn.webp");
+  mask-image: url("/assets/moyoy-candidate/mask/mask-pc-dawn.webp");
+}
+
+.chapter-alpine .chapter-photo {
+  -webkit-mask-image: url("/assets/moyoy-candidate/mask/mask-pc-alpine.webp");
+  mask-image: url("/assets/moyoy-candidate/mask/mask-pc-alpine.webp");
+}
+
+.chapter-copy {
+  position: absolute;
+  z-index: 2;
+  top: 430px;
+  left: 117px;
+  width: 380px;
+  text-shadow:
+    -1px -1px 1px rgb(0 0 0 / 92%),
+    1px -1px 1px rgb(0 0 0 / 92%),
+    -1px 1px 1px rgb(0 0 0 / 92%),
+    1px 1px 1px rgb(0 0 0 / 92%),
+    0 2px 10px rgb(0 0 0 / 68%);
+}
+
+.chapter-eyebrow,
+.chapter-number,
+.chapter-prose {
+  margin: 0;
+}
+
+.chapter-eyebrow {
+  font-family: var(--latin);
+  font-size: 9px;
+  line-height: 12px;
+  letter-spacing: 0.9px;
+}
+
+.chapter-number {
+  margin-top: 6px;
+  font-family: var(--latin);
+  font-size: 18.5px;
+  line-height: 21px;
+  letter-spacing: 2.3px;
+}
+
+.chapter-prose {
+  margin-top: 40px;
+  font-family: var(--japanese);
+  font-size: 14px;
+  line-height: 32px;
+  letter-spacing: 0;
+}
+
+/* The approved drawing is authored as white line work that screens over the chapter
+   photograph. Rendered inside an <img> the file isolates its own blend group, so the
+   blend is re-applied here against the page instead. */
+.chapter-product {
+  --object-parallax-y: 0px;
+
+  width: 130px;
+  height: 112px;
+  margin-top: 35px;
+  transform: translate3d(0, var(--object-parallax-y), 0);
+}
+
+.chapter h2 {
+  position: absolute;
+  z-index: 2;
+  top: 422px;
+  right: 127px;
+  margin: 0;
+  font-family: var(--latin);
+  font-size: 62px;
+  font-weight: 400;
+  line-height: 65px;
+  letter-spacing: 16.3px;
+  text-orientation: mixed;
+  writing-mode: vertical-rl;
+  text-shadow:
+    -1px -1px 1px rgb(0 0 0 / 92%),
+    1px -1px 1px rgb(0 0 0 / 92%),
+    -1px 1px 1px rgb(0 0 0 / 92%),
+    1px 1px 1px rgb(0 0 0 / 92%),
+    0 2px 10px rgb(0 0 0 / 68%);
+}
+
+footer[data-fidelity="footer"] {
+  position: absolute;
+  z-index: 30;
+  top: 9068px;
+  left: 0;
+  width: 100%;
+  height: 368px;
+  overflow: visible;
+  background: var(--paper);
+}
+
+.brand-footer {
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 611px;
+}
+
+.footer-contact,
+.footer-legal {
+  position: absolute;
+  z-index: 3;
+  font-family: var(--japanese);
+}
+
+.footer-contact {
+  top: 61px;
+  left: 46px;
+  width: 520px;
+}
+
+.footer-legal {
+  top: 109px;
+  left: 832px;
+  width: 340px;
+}
+
+.footer-contact p,
+.footer-legal p {
+  margin: 0;
+}
+
+.footer-company {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.2px;
+}
+
+.footer-address {
+  margin-top: 11px !important;
+  font-size: 11.8px;
+  font-weight: 500;
+  line-height: 13px;
+  letter-spacing: 0.2px;
+}
+
+.footer-telephone {
+  margin-top: 4px !important;
+  font-family: var(--latin);
+  font-size: 11.8px;
+  font-weight: 500;
+  line-height: 12px;
+  letter-spacing: 0.6px;
+}
+
+.footer-account {
+  margin-top: 24px !important;
+  font-family: var(--latin);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.2px;
+}
+
+/* DA-FOOTER-01 removes the two policy links from the launch DOM. Their measured row is
+   reserved so every remaining footer element keeps its authored position. */
+.footer-legal[data-policy-hidden="true"] {
+  padding-top: 15px;
+}
+
+.footer-policy {
+  display: flex;
+  gap: 24px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 15px;
+  letter-spacing: 0.2px;
+}
+
+.footer-policy span::before {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.footer-copyright {
+  margin-top: 24px !important;
+  font-family: var(--latin);
+  font-size: 9.5px;
+  font-weight: 500;
+  line-height: 10px;
+  letter-spacing: 0.2px;
+}
+
+.footer-contours {
+  z-index: 1;
+  top: -117.37px;
+  left: 162.32px;
+  width: 1064.96px;
+  aspect-ratio: 1064.96 / 521.67;
+}
+
+/* DA-NAV-01 「上部に固定表示」 forks to the PC menu box and the SP menu box, so the
+   control is viewport-fixed at every width. The button lives in [data-app-shell], which
+   carries no transform, so `fixed` resolves against the viewport at desktop scale too. */
+/* VF-35. DA-NAV-01 pins the control to the top of the window, so at every width it
+   eventually sits over the chapter photography rather than over paper — and no single
+   colour survives that. Sampling the surface behind the control at 1440 × 900 shows why:
+   its relative luminance runs from 0.799 (the paper page) through 0.007 (the ROOT forest)
+   to 0.652 (the ALPINE snow), and it crosses the ink/paper break *inside* a single
+   chapter — DUSK alone spans 0.008 to 0.379. A static colour, and even a per-chapter
+   colour, is measurably impossible.
+   The control therefore adopts the treatment the page already uses for its own type over
+   these same photographs, approved on all four chapters: over paper it is the page ink
+   with no shadow, which is exactly the approved page-top frame; over a photograph it
+   inverts to the paper colour and carries the chapter halo. The background stays
+   transparent at every scroll position — nothing is ever painted behind the mark. */
+.menu-open-button {
+  position: fixed;
+  z-index: 50;
+  top: 8px;
+  right: max(8px, calc((100vw - 1200px) / 2 + 8px));
+  width: 92.71px;
+  height: 45px;
+  padding: 0;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  /* No-JavaScript floor: without the scroll owner the state never flips, so the ink mark
+     keeps a paper halo. Over paper the halo is the paper and the approved frame is
+     unchanged; over a dark frame it outlines the glyphs instead of losing them. */
+  filter: drop-shadow(0 0 1px var(--paper)) drop-shadow(0 0 2px var(--paper));
+  transition:
+    color 260ms var(--ease-ui),
+    filter 260ms var(--ease-ui);
+}
+
+/* Stacked drop-shadows compound, because each one is applied to the result of the last,
+   so the halo is dense at the glyph edge and falls away over about 7 px. The wide pair is
+   what carries the ALPINE frame, whose snow is lighter than the paper mark itself: with
+   only the tight pair the mark measured 3.18 : 1 against its surround there against
+   11.44 : 1 over ROOT. */
+.menu-open-button[data-over-media="true"] {
+  color: var(--paper);
+  filter: drop-shadow(0 0 1.5px rgb(0 0 0 / 96%)) drop-shadow(0 0 3px rgb(0 0 0 / 92%))
+    drop-shadow(0 0 7px rgb(0 0 0 / 78%)) drop-shadow(0 2px 12px rgb(0 0 0 / 60%));
+}
+
+.menu-control-visual {
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  right: 12px;
+  display: block;
+  width: 68.71px;
+  height: 21px;
+  color: inherit;
+}
+
+.menu-word {
+  position: absolute;
+  top: 7.7px;
+  left: 0;
+  font-family: var(--latin);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 8px;
+  letter-spacing: 0.7px;
+}
+
+.menu-grid {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  width: 21px;
+  height: 21px;
+  grid-template-columns: repeat(3, 3px);
+  grid-template-rows: repeat(3, 3px);
+  gap: 6px;
+}
+
+.menu-grid > span {
+  display: block;
+  width: 3px;
+  height: 3px;
+  background: currentColor;
+  transition: scale var(--dur-ui) var(--ease-ui) var(--dot-delay, 0ms);
+}
+
+/* A diagonal ripple across the 3×3 mark: the only idle-adjacent motion on the page, and
+   it answers a pointer or a keyboard focus rather than running on its own. */
+.menu-grid > :nth-child(1) {
+  --dot-delay: 0ms;
+}
+
+.menu-grid > :nth-child(2),
+.menu-grid > :nth-child(4) {
+  --dot-delay: 30ms;
+}
+
+.menu-grid > :nth-child(3),
+.menu-grid > :nth-child(5),
+.menu-grid > :nth-child(7) {
+  --dot-delay: 60ms;
+}
+
+.menu-grid > :nth-child(6),
+.menu-grid > :nth-child(8) {
+  --dot-delay: 90ms;
+}
+
+.menu-grid > :nth-child(9) {
+  --dot-delay: 120ms;
+}
+
+.menu-open-button:focus-visible .menu-grid > span {
+  scale: 1.55;
+}
+
+@media (hover: hover) {
+  .menu-open-button:hover .menu-grid > span {
+    scale: 1.55;
+  }
+}
+
+@media (width >= 1200px) {
+  .menu-open-button {
+    top: calc(8px * var(--desktop-scale));
+    right: calc(8px * var(--desktop-scale));
+    transform: scale(var(--desktop-scale));
+    transform-origin: top right;
+  }
+}
+
+.site-menu {
+  position: fixed;
+  z-index: 100;
+  inset: 0 0 0 auto;
+  width: 250px;
+  max-width: 250px;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  color: #fff;
+  background: var(--olive-aa);
+}
+
+/* VF-32. The drawer used to appear and disappear on a single frame. It now draws in
+   from the edge it belongs to, and the transition is owned entirely by CSS:
+   `transition-behavior: allow-discrete` keeps `display` and the top layer alive for the
+   exit, and `@starting-style` supplies the entry state, so no JavaScript holds
+   animation state and nothing can leave the dialog stuck half-open. */
+.site-menu {
+  translate: 100% 0;
+  opacity: 0;
+  transition:
+    translate var(--dur-menu-exit) var(--ease-exit),
+    opacity var(--dur-menu-exit) var(--ease-exit),
+    display var(--dur-menu-exit) allow-discrete,
+    overlay var(--dur-menu-exit) allow-discrete;
+}
+
+.site-menu[open] {
+  display: block;
+  translate: 0 0;
+  opacity: 1;
+  transition:
+    translate var(--dur-menu-enter) var(--ease-enter),
+    opacity 200ms var(--ease-enter),
+    display var(--dur-menu-enter) allow-discrete,
+    overlay var(--dur-menu-enter) allow-discrete;
+}
+
+@starting-style {
+  .site-menu[open] {
+    translate: 100% 0;
+    opacity: 0;
+  }
+}
+
+/* The approved frame shows the page at full brightness behind the open drawer, so the
+   backdrop stays clear; the panel earns its separation from its own edge, not a wash. */
+.site-menu::backdrop {
+  background: transparent;
+}
+
+/* One choreography: the panel arrives, then its groups settle in reading order. Each
+   item declares its rank once and the delay is derived from it, so the sequence cannot
+   drift out of step when the launch scope changes which groups are present. */
+.site-menu .menu-close-button,
+.site-menu .menu-content > :not(ul),
+.site-menu .menu-content li {
+  --enter-rank: 0;
+
+  opacity: 1;
+  translate: 0 0;
+  transition:
+    opacity 300ms var(--ease-enter)
+      calc(var(--enter-rank) * var(--menu-stagger) + var(--menu-settle-delay)),
+    translate 460ms var(--ease-enter)
+      calc(var(--enter-rank) * var(--menu-stagger) + var(--menu-settle-delay));
+}
+
+.site-menu .menu-content > :nth-child(1) {
+  --enter-rank: 1;
+}
+
+.site-menu .menu-content > :nth-child(2) {
+  --enter-rank: 2;
+}
+
+.site-menu .menu-content > :nth-child(3) {
+  --enter-rank: 3;
+}
+
+.site-menu .menu-content > :nth-child(4) {
+  --enter-rank: 4;
+}
+
+.site-menu .menu-content li:nth-child(1) {
+  --enter-rank: 5;
+}
+
+.site-menu .menu-content li:nth-child(2) {
+  --enter-rank: 6;
+}
+
+.site-menu .menu-content li:nth-child(3) {
+  --enter-rank: 7;
+}
+
+.site-menu .menu-content li:nth-child(4) {
+  --enter-rank: 8;
+}
+
+/* Matched through `.menu-content >` so it outranks the `:not(ul)` group selector that
+   seeds `--enter-rank: 0`. */
+.site-menu .menu-content > .menu-muted {
+  --enter-rank: 9;
+}
+
+@starting-style {
+  .site-menu[open] .menu-close-button,
+  .site-menu[open] .menu-content > :not(ul),
+  .site-menu[open] .menu-content li {
+    opacity: 0;
+    translate: 0 var(--menu-item-travel);
+  }
+}
+
+.menu-close-button {
+  position: absolute;
+  z-index: 2;
+  top: max(9.5px, calc(env(safe-area-inset-top) + 9.5px));
+  right: max(20px, env(safe-area-inset-right));
+  display: flex;
+  height: 44px;
+  padding: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.menu-close-button > span {
+  position: relative;
+  display: block;
+  order: 2;
+  width: 21px;
+  height: 21px;
+  border: 1px solid currentColor;
+  transition: scale var(--dur-ui) var(--ease-ui);
+}
+
+.menu-close-button:focus-visible > span {
+  scale: 1.08;
+}
+
+@media (hover: hover) {
+  .menu-close-button:hover > span {
+    scale: 1.08;
+  }
+}
+
+.menu-close-button > span::before,
+.menu-close-button > span::after {
+  position: absolute;
+  top: 9.5px;
+  left: 3px;
+  width: 15px;
+  height: 1px;
+  background: currentColor;
+  content: "";
+}
+
+.menu-close-button > span::before {
+  transform: rotate(45deg);
+}
+
+.menu-close-button > span::after {
+  transform: rotate(-45deg);
+}
+
+.menu-close-button small {
+  order: 1;
+  font-family: var(--latin);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.6px;
+}
+
+.menu-content {
+  width: 150px;
+  margin: max(98px, calc(env(safe-area-inset-top) + 80px)) 50px 50px;
+  font-family: var(--latin), var(--japanese);
+}
+
+/* The 2.5 px rule is drawn by a pseudo-element rather than a border so it can be drawn
+   on rather than switched on. `padding-bottom` absorbs the border box the rule used to
+   occupy, so every following element keeps its approved position to the pixel. */
+.menu-content h2 {
+  position: relative;
+  margin: 0;
+  padding-bottom: 5.5px;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 27px;
+  letter-spacing: 2.3px;
+}
+
+.menu-content h2::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2.5px;
+  background: currentColor;
+  content: "";
+  scale: 1 1;
+  transform-origin: left center;
+  transition: scale 720ms var(--ease-enter)
+    calc(var(--enter-rank) * var(--menu-stagger) + 260ms);
+}
+
+@starting-style {
+  .site-menu[open] .menu-content h2::after {
+    scale: 0 1;
+  }
+}
+
+.menu-content h2:not(:first-child) {
+  margin-top: 35px;
+}
+
+.menu-content p,
+.menu-content li {
+  margin: 4px 0 0;
+  font-family: var(--japanese);
+  font-size: 13px;
+  line-height: 18px;
+  letter-spacing: 0.8px;
+}
+
+.menu-content ul {
+  margin: 13px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The approved drawer uses a drawn long arrow. It is rendered here rather than taken
+   from a font glyph so the subset stays small and the mark keeps its exact length. */
+.menu-content li {
+  position: relative;
+  margin: 0;
+  padding-left: 32px;
+  font-family: var(--latin);
+  line-height: 28px;
+}
+
+.menu-content li::before,
+.menu-content li::after {
+  position: absolute;
+  content: "";
+}
+
+.menu-content li::before {
+  top: 14px;
+  left: 0;
+  width: 22px;
+  height: 1px;
+  background: currentColor;
+}
+
+.menu-content li::after {
+  top: 11px;
+  left: 16px;
+  width: 6px;
+  height: 6px;
+  border-top: 1px solid currentColor;
+  border-right: 1px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.menu-muted {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid rgb(255 255 255 / 45%);
+}
+
+@media (width >= 640px) and (width < 1200px) {
+  .page-canvas {
+    width: 100%;
+  }
+
+  .page-artboard {
+    height: 7900px;
+  }
+
+  .hero-contours {
+    top: -1.46vw;
+    left: -6.18vw;
+    width: 107.26vw;
+  }
+
+  /* DA-LAYOUT-01 on the tablet reflow: keep the wordmark on the browser centre line at
+     natural scale and let the open-ended rule run off the left edge. */
+  .brand-header {
+    left: calc(50% - 840.5px);
+    width: 917px;
+  }
+
+  .about-copy {
+    left: 33%;
+  }
+
+  .brand-center {
+    left: calc(50% - 130px);
+  }
+
+  .products {
+    left: 48px;
+    width: calc(100% - 96px);
+    gap: 32px;
+  }
+
+  .root-foreground {
+    top: 2300px;
+    width: 100%;
+  }
+
+  .chapter-root {
+    top: 2600px;
+    height: 1160px;
+  }
+
+  .chapter-dusk {
+    top: 3600px;
+    height: 1163px;
+  }
+
+  .chapter-dawn {
+    top: 4600px;
+    height: 1185px;
+  }
+
+  .chapter-alpine {
+    top: 5600px;
+    height: 1165px;
+  }
+
+  .chapter-copy {
+    top: 245px;
+    left: 48px;
+  }
+
+  .chapter h2 {
+    top: 245px;
+    right: 48px;
+  }
+
+  footer[data-fidelity="footer"] {
+    top: 7400px;
+    height: 500px;
+  }
+
+  .footer-contact {
+    left: 48px;
+  }
+
+  .footer-legal {
+    left: auto;
+    right: 48px;
+    width: auto;
+  }
+
+  .products {
+    top: 1585px;
+  }
+
+  .footer-contours {
+    top: -9.78vw;
+    left: 13.53vw;
+    width: 88.75vw;
+  }
+}
+
+/* Between 640 px and 1200 px the PC contour exports are still in use, so the PC boxes
+   stay authoritative and only the placement above changes. */
+
+@media (width <= 639px) {
+  /* VF-34. The SP band used to resolve two different scales at once: the decorative
+     artwork and the chapter strips were sized in `vw`, so they grew with the window,
+     while every piece of type and furniture kept its authored 375 px offset. At 375 the
+     two agree and the composition matches the approved frame; at 390 the contour system
+     is already 4 % larger and 36 px lower where the prose still starts at 842.5, and by
+     430 the divergence is 15 % — which is why the mobile copy no longer sits on the
+     background line it was drawn against, and why a block centred on the 375 canvas
+     reads as left-of-centre on a wider phone.
+     One scale replaces both: the whole SP composition is authored on the 375 px canvas
+     and the artboard resolves that canvas against the viewport, exactly as the desktop
+     artboard resolves 1200. Every authored relationship then holds at every width. */
+  [data-app-shell] {
+    /* Source→canvas ratio of the 751 px chapter strips (a 2× render of the 375.5 px
+       canvas). A constant of the artwork, not of the window. */
+    --sp-source-scale: calc(375 / 751);
+    --mobile-scale: tan(atan2(100vw, 375px));
+    --first-view-height: calc(100dvh / var(--mobile-scale));
+  }
+
+  .page-canvas {
+    width: 100%;
+    box-shadow: none;
+  }
+
+  /* `zoom` rather than `transform: scale()`, for the same reason the desktop artboard
+     uses it: a transformed ancestor would become the containing block for the
+     `position: fixed` chapter plate and DA-MEDIA-01 would have to be emulated again. */
+  .page-artboard {
+    width: 375px;
+    height: calc(2493px + 6539px * var(--sp-source-scale) + 166.853529px + 457px);
+    zoom: var(--mobile-scale);
+  }
+
+  .intro {
+    height: 2493px;
+  }
+
+  /* The SP contour exports have their own viewBox, so each stack needs its own box.
+     Stated in canvas pixels: these are the same numbers the `vw` forms resolved to at
+     375, so the approved 375 rendering is unchanged and every other width is now a
+     uniform scale of it rather than a second, conflicting scale. */
+  .hero-contours {
+    top: -6.4875px;
+    left: -104.025px;
+    width: 495.9375px;
+    aspect-ratio: 495.95 / 920.64;
+  }
+
+  .brand-header {
+    top: 321.9px;
+    left: -652px;
+    width: 917px;
+  }
+
+  /* Same rule against the SP first-view frame: authored 602.8 wherever the window can
+     show it, rising only on a window shorter than the authored 667 px band — which the
+     wide end of this range produces, since 639 px zooms the canvas by 1.7. `max()` holds
+     it clear of the SP brand rule, which ends at 336.9. */
+  .scroll-indicator {
+    top: max(360px, min(602.8px, calc(var(--first-view-height) - 64.2px)));
+    left: 172.9px;
+  }
+
+  .chapter-root .chapter-photo {
+    -webkit-mask-image: url("/assets/moyoy-candidate/mask/mask-sp-root.webp");
+    mask-image: url("/assets/moyoy-candidate/mask/mask-sp-root.webp");
+  }
+
+  .chapter-dusk .chapter-photo {
+    -webkit-mask-image: url("/assets/moyoy-candidate/mask/mask-sp-dusk.webp");
+    mask-image: url("/assets/moyoy-candidate/mask/mask-sp-dusk.webp");
+  }
+
+  .chapter-dawn .chapter-photo {
+    -webkit-mask-image: url("/assets/moyoy-candidate/mask/mask-sp-dawn.webp");
+    mask-image: url("/assets/moyoy-candidate/mask/mask-sp-dawn.webp");
+  }
+
+  .chapter-alpine .chapter-photo {
+    -webkit-mask-image: url("/assets/moyoy-candidate/mask/mask-sp-alpine.webp");
+    mask-image: url("/assets/moyoy-candidate/mask/mask-sp-alpine.webp");
+  }
+
+  /* VF-28. The approved SP frame keeps the prose in vertical columns and sets the
+     heading horizontally under it, centred on the canvas. The measured 237.42 px block
+     recorded in the spec is the *width of eight vertical columns*, not a horizontal
+     wrap width; reading it as a wrap width is what collapsed this section. Reference
+     ink: prose columns at 32 px pitch with the first column's ink ending at x 305.5 and
+     the block starting at y 844; heading ink rows 1202–1219 centred on x 187. */
+  .about-copy {
+    top: 842.5px;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: 380px;
+  }
+
+  .about-copy h1 {
+    position: absolute;
+    top: 355.5px;
+    left: 0;
+    width: 100%;
+    /* Absorbs the trailing letter-space so the centred ink sits on the canvas centre. */
+    padding-left: 7.25px;
+    font-size: 18px;
+    line-height: 22.5px;
+    letter-spacing: 7.25px;
+    text-align: center;
+    writing-mode: horizontal-tb;
+  }
+
+  .about-copy p {
+    /* Eight approved hard breaks at the 32 px column pitch. */
+    width: 256px;
+    height: 100%;
+    margin-right: 59.8px;
+    margin-left: auto;
+    font-size: 14px;
+    line-height: 32px;
+    letter-spacing: 0;
+  }
+
+  .brand-center {
+    top: 1304px;
+    left: calc(50% - 98px);
+    width: 195px;
+  }
+
+  /* VF-33. The approved SP frame draws every product at its natural size, centres each
+     drawing on x 106.5, starts a left-aligned copy column at x 199, and gives the
+     drawing and the copy a shared bottom edge at y 1650 / 1872 / 2189. The previous
+     centred, equal-height rows put the whole block 148 px low with the copy centred.
+     The rows are declared rather than derived: the diffuser is nearly twice the height
+     of the bottles, so one uniform row rhythm cannot reach all three measured bottoms. */
+  .products {
+    top: 1520px;
+    left: 0;
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr;
+    grid-template-rows: 130px 150px 245px;
+    row-gap: 72px;
+  }
+
+  .product {
+    min-height: 0;
+    grid-template-columns: 199px 1fr;
+    grid-template-rows: 1fr;
+    align-items: end;
+    justify-items: stretch;
+  }
+
+  .product-drawing {
+    /* `padding-left` moves the centred drawing from the 199 px column's own centre
+       (99.5) onto the approved centre line at 106.5. */
+    width: 100%;
+    height: auto;
+    padding-left: 14px;
+    align-items: end;
+  }
+
+  .product-drawing img {
+    max-width: none;
+    max-height: none;
+  }
+
+  /* Measured ink pitch inside the copy column: category → name 23, name → volume 35,
+     volume → dimensions 16, dimensions → price 36. */
+  .product-copy {
+    padding-top: 0;
+    text-align: left;
+  }
+
+  .product-copy h2,
+  .product-copy p {
+    margin: 0;
+  }
+
+  .product-copy h2 {
+    margin-top: 9px;
+  }
+
+  .product-volume {
+    margin-top: 16px !important;
+  }
+
+  .product-volume,
+  .product-dimensions {
+    font-size: 11px;
+    line-height: 14px;
+  }
+
+  .product-dimensions {
+    margin-top: 2px !important;
+  }
+
+  /* `keep-all` holds each Japanese label together so the approved price lines break at
+     their own space, the way the reference sets them, instead of mid-word. */
+  .product-price {
+    margin-top: 21px !important;
+    font-feature-settings: "palt";
+    font-size: 15px;
+    line-height: 19px;
+    word-break: keep-all;
+  }
+
+  .product-price + .product-price {
+    margin-top: 6px !important;
+  }
+
+  .product-contours {
+    top: 2205px;
+    left: -48px;
+    width: 472px;
+    aspect-ratio: 471.74 / 170.37;
+  }
+
+  .root-foreground {
+    top: 2441px;
+    width: 100%;
+  }
+
+  .chapter-root {
+    top: 2493px;
+    height: calc(1733px * var(--sp-source-scale));
+  }
+
+  .chapter-dusk {
+    top: calc(2493px + 1600px * var(--sp-source-scale));
+    height: calc(1736px * var(--sp-source-scale));
+  }
+
+  .chapter-dawn {
+    top: calc(2493px + 3200px * var(--sp-source-scale));
+    height: calc(1758px * var(--sp-source-scale));
+  }
+
+  .chapter-alpine {
+    top: calc(2493px + 4800px * var(--sp-source-scale));
+    height: calc(1739px * var(--sp-source-scale));
+  }
+
+  .chapter-copy {
+    top: 133px;
+    left: 49px;
+    width: 270px;
+  }
+
+  .chapter-eyebrow {
+    font-size: 9px;
+    line-height: 12px;
+  }
+
+  .chapter-number {
+    font-size: 18.5px;
+    line-height: 21px;
+  }
+
+  .chapter-prose {
+    margin-top: 40px;
+    font-size: 14px;
+    line-height: 32px;
+  }
+
+  .chapter-product {
+    width: 92px;
+    height: auto;
+    margin-top: 18px;
+  }
+
+  .chapter h2 {
+    top: 133px;
+    right: 27px;
+    font-size: 37.5px;
+    line-height: 40px;
+    letter-spacing: 10px;
+  }
+
+  footer[data-fidelity="footer"] {
+    top: calc(2493px + 6539px * var(--sp-source-scale) + 166.853529px);
+    height: 457px;
+  }
+
+  /* VF-29. `sp-brand-footer-line.svg` is byte-identical to the header artwork, and the
+     approved SP frame confirms that: the footer mark's ink occupies exactly the header
+     mark's columns (0–265) at the same 15.02 px height. Sizing the 917-unit drawing to
+     250 px squashed the whole wordmark into a 4 px rule. It is anchored like the header
+     instead, so the open-ended rule runs off the left edge at natural scale. */
+  .brand-footer {
+    left: -652px;
+    width: 917px;
+  }
+
+  .footer-contact {
+    top: 72px;
+    left: 29px;
+    width: calc(100% - 58px);
+  }
+
+  /* Reference ink offsets below the footer mark: company +73, address +98,
+     telephone +115, account +150. */
+  .footer-address {
+    margin-top: 10px !important;
+  }
+
+  .footer-telephone {
+    margin-top: 6px !important;
+  }
+
+  .footer-account {
+    margin-top: 22px !important;
+  }
+
+  /* The approved SP frame sets both policy labels on one row at +230 below the footer
+     mark and the copyright at +270, so the row DA-FOOTER-01 hides reserves one line —
+     not the two the previous stacked reading reserved, which pushed the copyright
+     17.5 px below its approved position. */
+  .footer-legal {
+    top: 228.5px;
+    left: 29px;
+    width: calc(100% - 58px);
+  }
+
+  .footer-contours {
+    top: 187.8px;
+    left: -49.3875px;
+    width: 600.1125px;
+    aspect-ratio: 600.13 / 294.03;
+  }
+
+  .menu-open-button {
+    position: fixed;
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    width: 44px;
+    height: 56.6px;
+  }
+
+  /* VF-35. The SP control used to be permanently inverted with a fixed dark halo, which
+     read as a different control from the one the approved page-top frame shows. It now
+     shares the adaptive treatment declared above, so the page top is the approved frame
+     at every width and only the photography states differ. */
+  .menu-control-visual {
+    top: 12px;
+    right: 10px;
+    width: 26.15px;
+    height: 40.6px;
+  }
+
+  .menu-word {
+    top: 33px;
+    font-size: 8.6px;
+    line-height: 7.6px;
+    letter-spacing: 0.25px;
+  }
+
+  .menu-grid {
+    right: 2.58px;
+  }
+
+  /* VF-30. The approved SP drawer stacks the mark over its label; only the PC drawer
+     sets them side by side. Reference ink: box x 333–354 / y 20–40, label x 329–358 /
+     y 50–60, both centred on x 343.5. */
+  .menu-close-button {
+    top: max(20px, calc(env(safe-area-inset-top) + 20px));
+    height: auto;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .menu-close-button > span {
+    order: 1;
+  }
+
+  .menu-close-button small {
+    order: 2;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .contour-layer,
+  .brand-header,
+  .brand-center,
+  .brand-footer,
+  .product-drawing img,
+  .chapter-product,
+  .chapter-photo-pin img {
+    transform: none !important;
+    will-change: auto;
+  }
+
+  /* Releasing the pin returns each chapter to ordinary static flow, and the photograph
+     fills its own chapter box again so the whole approved frame stays visible. */
+  .chapter-photo-pin {
+    position: absolute;
+    inset: 0;
+    overflow: clip;
+  }
+
+  .chapter-photo-pin img {
+    height: 100%;
+    min-height: 0;
+  }
+
+  /* DA-MOTION-03 keeps a designed static indicator: the full-length rule, not a
+     zero-height remnant of the loop. */
+  .scroll-indicator-line {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  /* The drawer keeps a designed fallback rather than losing its transition: it still
+     resolves over 140 ms, but only in opacity — nothing travels, nothing staggers, and
+     the rules are already drawn. */
+  .site-menu,
+  .site-menu[open] {
+    translate: none !important;
+    transition:
+      opacity 140ms linear,
+      display 140ms allow-discrete,
+      overlay 140ms allow-discrete !important;
+  }
+
+  .site-menu .menu-close-button,
+  .site-menu .menu-content > :not(ul),
+  .site-menu .menu-content li,
+  .site-menu .menu-content h2::after,
+  .menu-grid > span,
+  .menu-close-button > span {
+    scale: none !important;
+    translate: none !important;
+    opacity: 1 !important;
+    transition: none !important;
+  }
+
   *,
   *::before,
   *::after {

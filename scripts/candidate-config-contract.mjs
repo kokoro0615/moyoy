@@ -11,6 +11,8 @@ export const REQUIRED_VIEWPORTS = new Set(["1440x900", "768x1024", "390x844"]);
 export const REQUIRED_COVERAGE = new Set([
   "desktop-top-menu-closed",
   "desktop-root-dusk-dawn-alpine-footer",
+  "tablet-root-dusk-dawn-alpine-footer",
+  "mobile-root-dusk-dawn-alpine-footer",
   "tablet-top-menu-closed",
   "mobile-top-menu-closed",
   "menu-open-all-viewports",
@@ -18,6 +20,7 @@ export const REQUIRED_COVERAGE = new Set([
 export const REFERENCE_ROOT = ".private/references/approved";
 export const ACTUAL_ROOT = CAPTURE_RUNS_ROOT;
 export const DETECTOR_ROOT = "scripts/fidelity/detectors";
+export const MASK_ROOT = "config/fidelity-masks";
 
 const CHAPTER_SEMANTICS = ["root", "dusk", "dawn", "alpine", "footer"];
 const SEMANTICS = new Set(["top", "menu-open", ...CHAPTER_SEMANTICS]);
@@ -604,33 +607,36 @@ function validateCoverageConfig(config, frameById, errors) {
   expectTop("tablet-top-menu-closed", "768x1024");
   expectTop("mobile-top-menu-closed", "390x844");
 
-  const chapterObservations =
-    observationsByCoverageId.get("desktop-root-dusk-dawn-alpine-footer") ?? [];
-  for (const semantic of CHAPTER_SEMANTICS) {
-    if (
-      !chapterObservations.some((binding) => {
-        const frame = frameById.get(binding.frameId);
-        return (
-          binding.semantic === semantic &&
-          frame?.semanticObservation?.semantic === semantic &&
-          frame.viewport?.width === 1440 &&
-          frame.viewport?.height === 900 &&
-          frame.state?.id === "menu-closed"
-        );
-      })
-    ) {
-      errors.push(`desktop chapter coverage lacks concrete ${semantic} frame`);
+  const expectChapterCoverage = (coverageId, viewport, label) => {
+    const chapterObservations = observationsByCoverageId.get(coverageId) ?? [];
+    for (const semantic of CHAPTER_SEMANTICS) {
+      if (
+        !chapterObservations.some((binding) => {
+          const frame = frameById.get(binding.frameId);
+          return (
+            binding.semantic === semantic &&
+            frame?.semanticObservation?.semantic === semantic &&
+            `${frame.viewport?.width}x${frame.viewport?.height}` === viewport &&
+            frame.state?.id === "menu-closed"
+          );
+        })
+      ) {
+        errors.push(`${label} chapter coverage lacks concrete ${semantic} frame`);
+      }
     }
-  }
-  if (
-    chapterObservations.length !== CHAPTER_SEMANTICS.length ||
-    !arraysEqual(
-      sorted(chapterObservations.map((binding) => binding.semantic)),
-      sorted(CHAPTER_SEMANTICS),
-    )
-  ) {
-    errors.push("desktop chapter coverage must bind the exact five semantics");
-  }
+    if (
+      chapterObservations.length !== CHAPTER_SEMANTICS.length ||
+      !arraysEqual(
+        sorted(chapterObservations.map((binding) => binding.semantic)),
+        sorted(CHAPTER_SEMANTICS),
+      )
+    ) {
+      errors.push(`${label} chapter coverage must bind the exact five semantics`);
+    }
+  };
+  expectChapterCoverage("desktop-root-dusk-dawn-alpine-footer", "1440x900", "desktop");
+  expectChapterCoverage("tablet-root-dusk-dawn-alpine-footer", "768x1024", "tablet");
+  expectChapterCoverage("mobile-root-dusk-dawn-alpine-footer", "390x844", "mobile");
 
   const openFrames = (byId.get("menu-open-all-viewports")?.frameIds ?? [])
     .map((id) => frameById.get(id))
@@ -683,7 +689,9 @@ function validateGeometryContracts(frame, errors) {
   for (const region of regions) {
     if (
       !region?.id ||
-      !pathIsWithin(region.mask?.path ?? "", REFERENCE_ROOT) ||
+      ![REFERENCE_ROOT, MASK_ROOT].some((root) =>
+        pathIsWithin(region.mask?.path ?? "", root),
+      ) ||
       !SHA256.test(region.mask?.sha256 ?? "") ||
       region.mask?.width !== frame.viewport?.width ||
       region.mask?.height !== frame.viewport?.height ||

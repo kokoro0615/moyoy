@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, stat, symlink } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, symlink, writeFile } from "node:fs/promises";
 import { relative } from "node:path";
 
 import { expect, test } from "@playwright/test";
@@ -104,6 +104,209 @@ test("never overwrites evidence for a duplicate destination", async ({}, testInf
   );
 });
 
+test("executes hash-bound landmark and region contracts on both rasters", async ({}, testInfo) => {
+  const projectRoot = process.cwd();
+  const fixtureRoot = testInfo.outputPath("geometry-contract");
+  const reference = `${fixtureRoot}/reference.png`;
+  const actual = `${fixtureRoot}/actual.png`;
+  const mask = `${fixtureRoot}/mask.json`;
+  const output = `${fixtureRoot}/output`;
+  const configPath = `${fixtureRoot}/fidelity.json`;
+  await mkdir(fixtureRoot, { recursive: true });
+  await Promise.all([boundaryPng(reference, 17), boundaryPng(actual, 17)]);
+  await writeFile(
+    mask,
+    `${JSON.stringify({
+      schemaVersion: 1,
+      width: 40,
+      height: 20,
+      rectangles: [{ x: 0, y: 0, width: 40, height: 20 }],
+    })}\n`,
+  );
+  const detectorPath = "scripts/fidelity/detectors/edge-landmark.mjs";
+  const config = {
+    frames: [
+      {
+        id: "fixture-frame",
+        geometryContract: {
+          status: "approved",
+          executionStatus: "available",
+          landmarks: [
+            {
+              id: "split-edge",
+              detector: {
+                id: "mean-luma-edge-v1",
+                path: detectorPath,
+                sha256: sha256(await readFile(detectorPath)),
+              },
+              parameters: { axis: "x", roi: [0.2, 0.1, 0.6, 0.8] },
+              thresholds: { maxDeltaPx: 0, minConfidence: 0.5 },
+            },
+          ],
+          regions: [
+            {
+              id: "whole-frame",
+              mask: {
+                path: relative(projectRoot, mask),
+                sha256: sha256(await readFile(mask)),
+              },
+              thresholds: {
+                pixelThreshold: 0,
+                maxMae: 0,
+                maxDiffRatio: 0,
+                maxEdgeMae: 0,
+              },
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const configBytes = Buffer.from(`${JSON.stringify(config, null, 2)}\n`);
+  await writeFile(configPath, configBytes);
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      "scripts/visual-fidelity.mjs",
+      "--root",
+      projectRoot,
+      "--reference",
+      relative(projectRoot, reference),
+      "--actual",
+      relative(projectRoot, actual),
+      "--out",
+      relative(projectRoot, output),
+      "--label",
+      "geometry",
+      "--frame-id",
+      "fixture-frame",
+      "--config",
+      relative(projectRoot, configPath),
+      "--config-sha256",
+      sha256(configBytes),
+      "--max-mae",
+      "0",
+      "--max-diff-ratio",
+      "0",
+      "--max-edge-mae",
+      "0",
+    ],
+    { cwd: projectRoot, encoding: "utf8" },
+  );
+
+  expect(result.status, result.stderr).toBe(0);
+  const report = JSON.parse(await readFile(`${output}/geometry-evidence.json`, "utf8"));
+  expect(report).toMatchObject({
+    status: "PASS",
+    evidenceStatus: "PASS",
+    landmarkResults: [{ contractId: "split-edge", status: "PASS" }],
+    regionResults: [{ contractId: "whole-frame", status: "PASS" }],
+  });
+});
+
+test("returns a failing exit code when an executed geometry contract fails", async ({}, testInfo) => {
+  const projectRoot = process.cwd();
+  const fixtureRoot = testInfo.outputPath("failing-geometry-contract");
+  const reference = `${fixtureRoot}/reference.png`;
+  const actual = `${fixtureRoot}/actual.png`;
+  const mask = `${fixtureRoot}/mask.json`;
+  const output = `${fixtureRoot}/output`;
+  const configPath = `${fixtureRoot}/fidelity.json`;
+  await mkdir(fixtureRoot, { recursive: true });
+  await Promise.all([boundaryPng(reference, 17), boundaryPng(actual, 19)]);
+  await writeFile(
+    mask,
+    `${JSON.stringify({
+      schemaVersion: 1,
+      width: 40,
+      height: 20,
+      rectangles: [{ x: 0, y: 0, width: 40, height: 20 }],
+    })}\n`,
+  );
+  const detectorPath = "scripts/fidelity/detectors/edge-landmark.mjs";
+  const config = {
+    frames: [
+      {
+        id: "fixture-frame",
+        geometryContract: {
+          status: "approved",
+          executionStatus: "available",
+          landmarks: [
+            {
+              id: "split-edge",
+              detector: {
+                id: "mean-luma-edge-v1",
+                path: detectorPath,
+                sha256: sha256(await readFile(detectorPath)),
+              },
+              parameters: { axis: "x", roi: [0.2, 0.1, 0.6, 0.8] },
+              thresholds: { maxDeltaPx: 0, minConfidence: 0.5 },
+            },
+          ],
+          regions: [
+            {
+              id: "whole-frame",
+              mask: {
+                path: relative(projectRoot, mask),
+                sha256: sha256(await readFile(mask)),
+              },
+              thresholds: {
+                pixelThreshold: 1,
+                maxMae: 1,
+                maxDiffRatio: 1,
+                maxEdgeMae: 1,
+              },
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const configBytes = Buffer.from(`${JSON.stringify(config, null, 2)}\n`);
+  await writeFile(configPath, configBytes);
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      "scripts/visual-fidelity.mjs",
+      "--root",
+      projectRoot,
+      "--reference",
+      relative(projectRoot, reference),
+      "--actual",
+      relative(projectRoot, actual),
+      "--out",
+      relative(projectRoot, output),
+      "--label",
+      "failing-geometry",
+      "--frame-id",
+      "fixture-frame",
+      "--config",
+      relative(projectRoot, configPath),
+      "--config-sha256",
+      sha256(configBytes),
+      "--max-mae",
+      "1",
+      "--max-diff-ratio",
+      "1",
+      "--max-edge-mae",
+      "1",
+    ],
+    { cwd: projectRoot, encoding: "utf8" },
+  );
+
+  expect(result.status).toBe(1);
+  const report = JSON.parse(
+    await readFile(`${output}/failing-geometry-evidence.json`, "utf8"),
+  );
+  expect(report).toMatchObject({
+    status: "UNAVAILABLE",
+    evidenceStatus: "UNAVAILABLE",
+    landmarkResults: [{ contractId: "split-edge", status: "FAIL" }],
+  });
+});
+
 interface RasterFixture {
   readonly actual: string;
   readonly output: string;
@@ -163,4 +366,20 @@ async function pathExists(path: string): Promise<boolean> {
 
 function sha256(value: Buffer): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+async function boundaryPng(path: string, boundary: number): Promise<void> {
+  const width = 40;
+  const height = 20;
+  const data = Buffer.alloc(width * height * 3);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const value = x < boundary ? 24 : 224;
+      const index = (y * width + x) * 3;
+      data.fill(value, index, index + 3);
+    }
+  }
+  await sharp(data, { raw: { width, height, channels: 3 } })
+    .png()
+    .toFile(path);
 }

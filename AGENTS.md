@@ -3,9 +3,9 @@
 ## Scope and repository state
 
 - This directory is an independent Git repository with a public remote.
-- The project is in foundation/specification state. A pinned package manifest, lockfile,
-  foundation application shell, configuration, gate scripts/tests, and CI workflow
-  exist; the approved MOYOY production UI and a committed baseline do not.
+- The committed baseline is foundation/specification-only. The worktree contains an
+  uncommitted MOYOY production candidate plus configuration, gate scripts/tests, and CI;
+  it is not an approved or committed production baseline.
 - Use `image-to-code` Mode C. The supplied PC/SP design is the visual reference; do not
   generate a replacement direction.
 
@@ -53,7 +53,8 @@ before any deliberate upgrade; never update them incidentally.
 ## Required workflow
 
 1. Read both DESIGN ledgers, `docs/design-annotation-ledger.md`, and the open-question,
-   invariant, provenance, and measured-spec documents.
+   invariant, provenance, measured-spec, and `docs/visual-fidelity-defects.md`
+   documents.
 2. Run the strict Mode C project audit with `--require-reference-diff` before production
    UI edits.
 3. Do not code past Gate C while reference scale, modal, responsive framing, typography,
@@ -62,6 +63,27 @@ before any deliberate upgrade; never update them incidentally.
 5. Compare external reference and current production-build capture at 1440×900,
    768×1024, and 390×844. Keep regression snapshots separate.
 6. Record every intentional visual or accessibility deviation before approval.
+
+## Visual verification and claim gate
+
+- DOM, CSS, SVG, image files, component references, and a successful build prove only
+  that an implementation exists. They never prove that it matches the supplied design.
+- Before answering that any visual region is correct, implemented faithfully, fixed,
+  complete, or matching, create a fresh production-build capture from an owned server
+  and compare it with the approved external reference at the same viewport, route,
+  state, scroll framing, content, and browser conditions.
+- Inspect the reference, actual, overlay, and amplified difference at original detail.
+  Check every region named by the user, including off-screen/footer regions and
+  menu-open/menu-closed states; a top-only capture cannot verify a footer claim.
+- For PC/SP source-layout questions, also inspect the approved 1200 px PC and 375 px SP
+  frames. Required release evidence remains 1440×900, 768×1024, and 390×844.
+- If an exact reference, deterministic capture, comparison artifact, or material-state
+  inspection is missing, report the result as `UNVERIFIED` or `BLOCKED`, never as a
+  visual pass. Passing regression snapshots or technical gates cannot substitute for
+  external-reference fidelity.
+- Record every discovered mismatch in `docs/visual-fidelity-defects.md`. A defect can be
+  closed only with fresh symptom-specific comparison evidence; code inspection or asset
+  presence alone cannot close it.
 
 ## Scripts and gates
 
@@ -129,3 +151,13 @@ remains blocked unless a human accepts a documented exception and risk.
 - Keep `docs/open-questions.md` and Gate tables current.
 - User-facing handoff is Japanese; code, identifiers, and technical artifacts may use
   English.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -1,13 +1,13 @@
 {
   "schemaVersion": 2,
-  "foundationOnly": true,
+  "foundationOnly": false,
   "route": "/",
   "approvalManifest": ".private/approvals/fidelity-approval.json",
   "evidenceContract": {
     "status": "unavailable",
     "manifest": "artifacts/fidelity/comparisons/fidelity-evidence-manifest.json",
     "schemaVersion": 1,
-    "reason": "Approved executable landmark detectors, region masks, and exact-frame references are unavailable."
+    "reason": "The production candidate DOM and capture selectors are implemented. Exact-frame approval, approved production derivatives, and executed comparisons remain unavailable until Gate D/E review."
   },
   "captureEnvironment": {
     "colorScheme": "light",
@@ -23,293 +23,2513 @@
   "frames": [
     {
       "id": "lp-1440x900-menu-closed-top",
-      "label": "lp-1440x900",
-      "viewport": { "width": 1440, "height": 900 },
+      "label": "lp-1440x900-top",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
       "route": "/",
-      "state": { "id": "menu-closed", "setup": "none" },
-      "scroll": { "x": 0, "y": 0 },
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": {
+        "x": 0,
+        "y": 0
+      },
       "semanticObservation": {
         "id": "desktop-top",
         "semantic": "top",
-        "status": "blocked",
-        "selector": "main[data-foundation-only='true']",
-        "scrollStrategy": { "kind": "absolute", "x": 0, "y": 0 },
+        "status": "approved",
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "scrollStrategy": {
+          "kind": "absolute",
+          "x": 0,
+          "y": 0
+        },
         "expected": {
           "visible": true,
           "stateId": "menu-closed",
-          "attributes": { "data-foundation-only": "true" }
+          "attributes": {
+            "data-page": "moyoy-lp",
+            "data-ready": "true"
+          }
         },
-        "landmarkIds": [],
-        "regionIds": [],
-        "reason": "This observes only the foundation marker; approved production top semantics and geometry remain unavailable."
+        "landmarkIds": ["desktop-canvas-left"],
+        "regionIds": ["desktop-top-core"],
+        "reason": "Approved Gate C semantic contract; production DOM is implemented while exact-frame approval and executed comparison remain pending."
       },
       "readiness": {
-        "selector": "main[data-foundation-only='true']",
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
         "images": "decode"
       },
-      "capture": { "fullPage": false },
-      "reference": ".private/references/approved/lp-1440x900.png",
-      "actualFile": "lp-1440x900.png",
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-1440x900-top.png",
+      "actualFile": "lp-1440x900-top.png",
       "approvalStatus": "blocked",
       "referenceContract": {
         "status": "blocked",
         "sha256": null,
         "width": null,
         "height": null,
-        "reason": "Approved exact-frame external reference is missing."
+        "reason": "Approved exact-frame reference is not yet materialized."
       },
       "geometryContract": {
-        "status": "blocked",
-        "executionStatus": "unavailable",
-        "landmarks": [],
-        "regions": [],
-        "reason": "Approved symmetric landmark detectors and region masks are missing."
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "desktop-canvas-left",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "x",
+              "roi": [0, 0.1, 0.2, 0.8]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "desktop-top-core",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-1440x900.json",
+              "sha256": "1b444e5642e6bc2c242ef57a076fa32e869454c8442ac55511389d65907134de",
+              "width": 1440,
+              "height": 900
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.015,
+              "maxDiffRatio": 0.035,
+              "maxEdgeMae": 0.025
+            }
+          }
+        ]
       },
-      "thresholds": null
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.015,
+        "maxDiffRatio": 0.035,
+        "maxEdgeMae": 0.025
+      }
+    },
+    {
+      "id": "lp-1440x900-root",
+      "label": "lp-1440x900-root",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "desktop-root",
+        "semantic": "root",
+        "status": "approved",
+        "selector": "section#root[data-chapter='root']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "root"
+          }
+        },
+        "landmarkIds": ["root-mask-edge"],
+        "regionIds": ["root-photo-region"],
+        "reason": "Approved Gate C chapter framing."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-1440x900-root.png",
+      "actualFile": "lp-1440x900-root.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame chapter reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "root-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "root-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-1440x900.json",
+              "sha256": "1b444e5642e6bc2c242ef57a076fa32e869454c8442ac55511389d65907134de",
+              "width": 1440,
+              "height": 900
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-1440x900-dusk",
+      "label": "lp-1440x900-dusk",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "desktop-dusk",
+        "semantic": "dusk",
+        "status": "approved",
+        "selector": "section#dusk[data-chapter='dusk']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "dusk"
+          }
+        },
+        "landmarkIds": ["dusk-mask-edge"],
+        "regionIds": ["dusk-photo-region"],
+        "reason": "Approved Gate C chapter framing."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-1440x900-dusk.png",
+      "actualFile": "lp-1440x900-dusk.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame chapter reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "dusk-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "dusk-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-1440x900.json",
+              "sha256": "1b444e5642e6bc2c242ef57a076fa32e869454c8442ac55511389d65907134de",
+              "width": 1440,
+              "height": 900
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-1440x900-dawn",
+      "label": "lp-1440x900-dawn",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "desktop-dawn",
+        "semantic": "dawn",
+        "status": "approved",
+        "selector": "section#dawn[data-chapter='dawn']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "dawn"
+          }
+        },
+        "landmarkIds": ["dawn-mask-edge"],
+        "regionIds": ["dawn-photo-region"],
+        "reason": "Approved Gate C chapter framing."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-1440x900-dawn.png",
+      "actualFile": "lp-1440x900-dawn.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame chapter reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "dawn-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "dawn-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-1440x900.json",
+              "sha256": "1b444e5642e6bc2c242ef57a076fa32e869454c8442ac55511389d65907134de",
+              "width": 1440,
+              "height": 900
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-1440x900-alpine",
+      "label": "lp-1440x900-alpine",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "desktop-alpine",
+        "semantic": "alpine",
+        "status": "approved",
+        "selector": "section#alpine[data-chapter='alpine']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "alpine"
+          }
+        },
+        "landmarkIds": ["alpine-mask-edge"],
+        "regionIds": ["alpine-photo-region"],
+        "reason": "Approved Gate C chapter framing."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-1440x900-alpine.png",
+      "actualFile": "lp-1440x900-alpine.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame chapter reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "alpine-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "alpine-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-1440x900.json",
+              "sha256": "1b444e5642e6bc2c242ef57a076fa32e869454c8442ac55511389d65907134de",
+              "width": 1440,
+              "height": 900
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-1440x900-footer",
+      "label": "lp-1440x900-footer",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "desktop-footer",
+        "semantic": "footer",
+        "status": "approved",
+        "selector": "footer[data-fidelity='footer']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "end",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": 0
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-fidelity": "footer"
+          }
+        },
+        "landmarkIds": ["footer-rule"],
+        "regionIds": ["footer-core"],
+        "reason": "Footer is captured against the viewport end after NEWS omission."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-1440x900-footer.png",
+      "actualFile": "lp-1440x900-footer.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame footer reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "footer-rule",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.4]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "footer-core",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-1440x900.json",
+              "sha256": "1b444e5642e6bc2c242ef57a076fa32e869454c8442ac55511389d65907134de",
+              "width": 1440,
+              "height": 900
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.015,
+              "maxDiffRatio": 0.035,
+              "maxEdgeMae": 0.025
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.015,
+        "maxDiffRatio": 0.035,
+        "maxEdgeMae": 0.025
+      }
     },
     {
       "id": "lp-768x1024-menu-closed-top",
-      "label": "lp-768x1024",
-      "viewport": { "width": 768, "height": 1024 },
+      "label": "lp-768x1024-top",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
       "route": "/",
-      "state": { "id": "menu-closed", "setup": "none" },
-      "scroll": { "x": 0, "y": 0 },
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": {
+        "x": 0,
+        "y": 0
+      },
       "semanticObservation": {
         "id": "tablet-top",
         "semantic": "top",
-        "status": "blocked",
-        "selector": "main[data-foundation-only='true']",
-        "scrollStrategy": { "kind": "absolute", "x": 0, "y": 0 },
+        "status": "approved",
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "scrollStrategy": {
+          "kind": "absolute",
+          "x": 0,
+          "y": 0
+        },
         "expected": {
           "visible": true,
           "stateId": "menu-closed",
-          "attributes": { "data-foundation-only": "true" }
+          "attributes": {
+            "data-page": "moyoy-lp",
+            "data-ready": "true"
+          }
         },
-        "landmarkIds": [],
-        "regionIds": [],
-        "reason": "This observes only the foundation marker; approved tablet semantics and geometry remain unavailable."
+        "landmarkIds": ["tablet-content-left"],
+        "regionIds": ["tablet-top-core"],
+        "reason": "Approved content-stress tablet contract."
       },
       "readiness": {
-        "selector": "main[data-foundation-only='true']",
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
         "images": "decode"
       },
-      "capture": { "fullPage": false },
-      "reference": ".private/references/approved/lp-768x1024.png",
-      "actualFile": "lp-768x1024.png",
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-768x1024-top.png",
+      "actualFile": "lp-768x1024-top.png",
       "approvalStatus": "blocked",
       "referenceContract": {
         "status": "blocked",
         "sha256": null,
         "width": null,
         "height": null,
-        "reason": "Approved tablet composition and exact-frame reference are missing."
+        "reason": "The written tablet specification has no approved exact-frame visual yet."
       },
       "geometryContract": {
-        "status": "blocked",
-        "executionStatus": "unavailable",
-        "landmarks": [],
-        "regions": [],
-        "reason": "Approved symmetric landmark detectors and region masks are missing."
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "tablet-content-left",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "x",
+              "roi": [0, 0.1, 0.2, 0.8]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "tablet-top-core",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-768x1024.json",
+              "sha256": "5927aaa906cd81a4bcd14422fed4a795759499f2f6dd4517b9cc685177d07ee7",
+              "width": 768,
+              "height": 1024
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.02,
+              "maxDiffRatio": 0.05,
+              "maxEdgeMae": 0.03
+            }
+          }
+        ]
       },
-      "thresholds": null
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.02,
+        "maxDiffRatio": 0.05,
+        "maxEdgeMae": 0.03
+      }
     },
     {
       "id": "lp-390x844-menu-closed-top",
-      "label": "lp-390x844",
-      "viewport": { "width": 390, "height": 844 },
+      "label": "lp-390x844-top",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
       "route": "/",
-      "state": { "id": "menu-closed", "setup": "none" },
-      "scroll": { "x": 0, "y": 0 },
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": {
+        "x": 0,
+        "y": 0
+      },
       "semanticObservation": {
         "id": "mobile-top",
         "semantic": "top",
-        "status": "blocked",
-        "selector": "main[data-foundation-only='true']",
-        "scrollStrategy": { "kind": "absolute", "x": 0, "y": 0 },
+        "status": "approved",
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "scrollStrategy": {
+          "kind": "absolute",
+          "x": 0,
+          "y": 0
+        },
         "expected": {
           "visible": true,
           "stateId": "menu-closed",
-          "attributes": { "data-foundation-only": "true" }
+          "attributes": {
+            "data-page": "moyoy-lp",
+            "data-ready": "true"
+          }
         },
-        "landmarkIds": [],
-        "regionIds": [],
-        "reason": "This observes only the foundation marker; approved mobile semantics and geometry remain unavailable."
+        "landmarkIds": ["mobile-content-left"],
+        "regionIds": ["mobile-top-core"],
+        "reason": "Approved 390 px reflow contract; the 375 px canvas is not stretched."
       },
       "readiness": {
-        "selector": "main[data-foundation-only='true']",
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
         "images": "decode"
       },
-      "capture": { "fullPage": false },
-      "reference": ".private/references/approved/lp-390x844.png",
-      "actualFile": "lp-390x844.png",
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-390x844-top.png",
+      "actualFile": "lp-390x844-top.png",
       "approvalStatus": "blocked",
       "referenceContract": {
         "status": "blocked",
         "sha256": null,
         "width": null,
         "height": null,
-        "reason": "Approved 390 px mapping and exact-frame reference are missing."
+        "reason": "The written 390 px reflow specification has no approved exact-frame visual yet."
       },
       "geometryContract": {
-        "status": "blocked",
-        "executionStatus": "unavailable",
-        "landmarks": [],
-        "regions": [],
-        "reason": "Approved symmetric landmark detectors and region masks are missing."
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "mobile-content-left",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "x",
+              "roi": [0, 0.1, 0.25, 0.8]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "mobile-top-core",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-390x844.json",
+              "sha256": "af9654f014ab1f1eb7b38c54bcc0dddb5af67ebab4cad84ffe2a788106bd59e9",
+              "width": 390,
+              "height": 844
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.02,
+              "maxDiffRatio": 0.05,
+              "maxEdgeMae": 0.03
+            }
+          }
+        ]
       },
-      "thresholds": null
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.02,
+        "maxDiffRatio": 0.05,
+        "maxEdgeMae": 0.03
+      }
+    },
+    {
+      "id": "lp-768x1024-root",
+      "label": "lp-768x1024-root",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "tablet-root",
+        "semantic": "root",
+        "status": "approved",
+        "selector": "section#root[data-chapter='root']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "root"
+          }
+        },
+        "landmarkIds": ["tablet-root-mask-edge"],
+        "regionIds": ["tablet-root-photo-region"],
+        "reason": "Written-spec 768x1024 root coverage; exact-frame approval remains Gate D/E work."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-768x1024-root.png",
+      "actualFile": "lp-768x1024-root.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame 768x1024 root reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "tablet-root-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "tablet-root-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-768x1024.json",
+              "sha256": "5927aaa906cd81a4bcd14422fed4a795759499f2f6dd4517b9cc685177d07ee7",
+              "width": 768,
+              "height": 1024
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-768x1024-dusk",
+      "label": "lp-768x1024-dusk",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "tablet-dusk",
+        "semantic": "dusk",
+        "status": "approved",
+        "selector": "section#dusk[data-chapter='dusk']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "dusk"
+          }
+        },
+        "landmarkIds": ["tablet-dusk-mask-edge"],
+        "regionIds": ["tablet-dusk-photo-region"],
+        "reason": "Written-spec 768x1024 dusk coverage; exact-frame approval remains Gate D/E work."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-768x1024-dusk.png",
+      "actualFile": "lp-768x1024-dusk.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame 768x1024 dusk reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "tablet-dusk-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "tablet-dusk-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-768x1024.json",
+              "sha256": "5927aaa906cd81a4bcd14422fed4a795759499f2f6dd4517b9cc685177d07ee7",
+              "width": 768,
+              "height": 1024
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-768x1024-dawn",
+      "label": "lp-768x1024-dawn",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "tablet-dawn",
+        "semantic": "dawn",
+        "status": "approved",
+        "selector": "section#dawn[data-chapter='dawn']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "dawn"
+          }
+        },
+        "landmarkIds": ["tablet-dawn-mask-edge"],
+        "regionIds": ["tablet-dawn-photo-region"],
+        "reason": "Written-spec 768x1024 dawn coverage; exact-frame approval remains Gate D/E work."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-768x1024-dawn.png",
+      "actualFile": "lp-768x1024-dawn.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame 768x1024 dawn reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "tablet-dawn-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "tablet-dawn-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-768x1024.json",
+              "sha256": "5927aaa906cd81a4bcd14422fed4a795759499f2f6dd4517b9cc685177d07ee7",
+              "width": 768,
+              "height": 1024
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-768x1024-alpine",
+      "label": "lp-768x1024-alpine",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "tablet-alpine",
+        "semantic": "alpine",
+        "status": "approved",
+        "selector": "section#alpine[data-chapter='alpine']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "alpine"
+          }
+        },
+        "landmarkIds": ["tablet-alpine-mask-edge"],
+        "regionIds": ["tablet-alpine-photo-region"],
+        "reason": "Written-spec 768x1024 alpine coverage; exact-frame approval remains Gate D/E work."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-768x1024-alpine.png",
+      "actualFile": "lp-768x1024-alpine.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame 768x1024 alpine reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "tablet-alpine-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "tablet-alpine-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-768x1024.json",
+              "sha256": "5927aaa906cd81a4bcd14422fed4a795759499f2f6dd4517b9cc685177d07ee7",
+              "width": 768,
+              "height": 1024
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-768x1024-footer",
+      "label": "lp-768x1024-footer",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "tablet-footer",
+        "semantic": "footer",
+        "status": "approved",
+        "selector": "footer[data-fidelity='footer']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "end",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": 0
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-fidelity": "footer"
+          }
+        },
+        "landmarkIds": ["tablet-footer-rule"],
+        "regionIds": ["tablet-footer-core"],
+        "reason": "Written-spec 768x1024 footer coverage; exact-frame approval remains Gate D/E work."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-768x1024-footer.png",
+      "actualFile": "lp-768x1024-footer.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame 768x1024 footer reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "tablet-footer-rule",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.4]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "tablet-footer-core",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-768x1024.json",
+              "sha256": "5927aaa906cd81a4bcd14422fed4a795759499f2f6dd4517b9cc685177d07ee7",
+              "width": 768,
+              "height": 1024
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.015,
+              "maxDiffRatio": 0.035,
+              "maxEdgeMae": 0.025
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.015,
+        "maxDiffRatio": 0.035,
+        "maxEdgeMae": 0.025
+      }
+    },
+    {
+      "id": "lp-390x844-root",
+      "label": "lp-390x844-root",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "mobile-root",
+        "semantic": "root",
+        "status": "approved",
+        "selector": "section#root[data-chapter='root']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "root"
+          }
+        },
+        "landmarkIds": ["mobile-root-mask-edge"],
+        "regionIds": ["mobile-root-photo-region"],
+        "reason": "Written-spec 390x844 root coverage; exact-frame approval remains Gate D/E work."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-390x844-root.png",
+      "actualFile": "lp-390x844-root.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame 390x844 root reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "mobile-root-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "mobile-root-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-390x844.json",
+              "sha256": "af9654f014ab1f1eb7b38c54bcc0dddb5af67ebab4cad84ffe2a788106bd59e9",
+              "width": 390,
+              "height": 844
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-390x844-dusk",
+      "label": "lp-390x844-dusk",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "mobile-dusk",
+        "semantic": "dusk",
+        "status": "approved",
+        "selector": "section#dusk[data-chapter='dusk']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "dusk"
+          }
+        },
+        "landmarkIds": ["mobile-dusk-mask-edge"],
+        "regionIds": ["mobile-dusk-photo-region"],
+        "reason": "Written-spec 390x844 dusk coverage; exact-frame approval remains Gate D/E work."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-390x844-dusk.png",
+      "actualFile": "lp-390x844-dusk.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame 390x844 dusk reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "mobile-dusk-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "mobile-dusk-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-390x844.json",
+              "sha256": "af9654f014ab1f1eb7b38c54bcc0dddb5af67ebab4cad84ffe2a788106bd59e9",
+              "width": 390,
+              "height": 844
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-390x844-dawn",
+      "label": "lp-390x844-dawn",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "mobile-dawn",
+        "semantic": "dawn",
+        "status": "approved",
+        "selector": "section#dawn[data-chapter='dawn']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "dawn"
+          }
+        },
+        "landmarkIds": ["mobile-dawn-mask-edge"],
+        "regionIds": ["mobile-dawn-photo-region"],
+        "reason": "Written-spec 390x844 dawn coverage; exact-frame approval remains Gate D/E work."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-390x844-dawn.png",
+      "actualFile": "lp-390x844-dawn.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame 390x844 dawn reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "mobile-dawn-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "mobile-dawn-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-390x844.json",
+              "sha256": "af9654f014ab1f1eb7b38c54bcc0dddb5af67ebab4cad84ffe2a788106bd59e9",
+              "width": 390,
+              "height": 844
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-390x844-alpine",
+      "label": "lp-390x844-alpine",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "mobile-alpine",
+        "semantic": "alpine",
+        "status": "approved",
+        "selector": "section#alpine[data-chapter='alpine']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "start",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": -96
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-chapter": "alpine"
+          }
+        },
+        "landmarkIds": ["mobile-alpine-mask-edge"],
+        "regionIds": ["mobile-alpine-photo-region"],
+        "reason": "Written-spec 390x844 alpine coverage; exact-frame approval remains Gate D/E work."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-390x844-alpine.png",
+      "actualFile": "lp-390x844-alpine.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame 390x844 alpine reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "mobile-alpine-mask-edge",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.5]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "mobile-alpine-photo-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-390x844.json",
+              "sha256": "af9654f014ab1f1eb7b38c54bcc0dddb5af67ebab4cad84ffe2a788106bd59e9",
+              "width": 390,
+              "height": 844
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.045,
+              "maxDiffRatio": 0.18,
+              "maxEdgeMae": 0.06
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.045,
+        "maxDiffRatio": 0.18,
+        "maxEdgeMae": 0.06
+      }
+    },
+    {
+      "id": "lp-390x844-footer",
+      "label": "lp-390x844-footer",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-closed",
+        "setup": "none"
+      },
+      "scroll": null,
+      "semanticObservation": {
+        "id": "mobile-footer",
+        "semantic": "footer",
+        "status": "approved",
+        "selector": "footer[data-fidelity='footer']",
+        "scrollStrategy": {
+          "kind": "selector-anchor",
+          "block": "end",
+          "inline": "center",
+          "offsetX": 0,
+          "offsetY": 0
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-closed",
+          "attributes": {
+            "data-fidelity": "footer"
+          }
+        },
+        "landmarkIds": ["mobile-footer-rule"],
+        "regionIds": ["mobile-footer-core"],
+        "reason": "Written-spec 390x844 footer coverage; exact-frame approval remains Gate D/E work."
+      },
+      "readiness": {
+        "selector": "main[data-page='moyoy-lp'][data-ready='true']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-390x844-footer.png",
+      "actualFile": "lp-390x844-footer.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved exact-frame 390x844 footer reference is not yet materialized."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "mobile-footer-rule",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "y",
+              "roi": [0.08, 0.05, 0.84, 0.4]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "mobile-footer-core",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/core-390x844.json",
+              "sha256": "af9654f014ab1f1eb7b38c54bcc0dddb5af67ebab4cad84ffe2a788106bd59e9",
+              "width": 390,
+              "height": 844
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.015,
+              "maxDiffRatio": 0.035,
+              "maxEdgeMae": 0.025
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.015,
+        "maxDiffRatio": 0.035,
+        "maxEdgeMae": 0.025
+      }
+    },
+    {
+      "id": "lp-1440x900-menu-open",
+      "label": "lp-1440x900-menu-open",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-open",
+        "setup": "open-menu",
+        "control": "button[data-fidelity-action='open-menu']"
+      },
+      "scroll": {
+        "x": 0,
+        "y": 0
+      },
+      "semanticObservation": {
+        "id": "desktop-menu-open",
+        "semantic": "menu-open",
+        "status": "approved",
+        "selector": "dialog#site-menu[open][data-state='open']",
+        "scrollStrategy": {
+          "kind": "absolute",
+          "x": 0,
+          "y": 0
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-open",
+          "attributes": {
+            "aria-modal": "true",
+            "data-state": "open"
+          }
+        },
+        "landmarkIds": ["desktop-drawer-left"],
+        "regionIds": ["desktop-drawer-region"],
+        "reason": "Viewport-fixed 250 px drawer contract."
+      },
+      "readiness": {
+        "selector": "dialog#site-menu[open][data-state='open']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-1440x900-menu-open.png",
+      "actualFile": "lp-1440x900-menu-open.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "Approved 1200 px appearance has not been materialized as an exact 1440x900 frame."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "desktop-drawer-left",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "x",
+              "roi": [0.7, 0.05, 0.3, 0.9]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "desktop-drawer-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/modal-1440x900.json",
+              "sha256": "f199f18b34ac8d933f91dfc5dc2c49e0e7e7771bfabc620bf383c88bd8bb0b58",
+              "width": 1440,
+              "height": 900
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.02,
+              "maxDiffRatio": 0.05,
+              "maxEdgeMae": 0.03
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.02,
+        "maxDiffRatio": 0.05,
+        "maxEdgeMae": 0.03
+      }
+    },
+    {
+      "id": "lp-768x1024-menu-open",
+      "label": "lp-768x1024-menu-open",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-open",
+        "setup": "open-menu",
+        "control": "button[data-fidelity-action='open-menu']"
+      },
+      "scroll": {
+        "x": 0,
+        "y": 0
+      },
+      "semanticObservation": {
+        "id": "tablet-menu-open",
+        "semantic": "menu-open",
+        "status": "approved",
+        "selector": "dialog#site-menu[open][data-state='open']",
+        "scrollStrategy": {
+          "kind": "absolute",
+          "x": 0,
+          "y": 0
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-open",
+          "attributes": {
+            "aria-modal": "true",
+            "data-state": "open"
+          }
+        },
+        "landmarkIds": ["tablet-drawer-left"],
+        "regionIds": ["tablet-drawer-region"],
+        "reason": "Viewport-fixed 250 px drawer contract."
+      },
+      "readiness": {
+        "selector": "dialog#site-menu[open][data-state='open']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-768x1024-menu-open.png",
+      "actualFile": "lp-768x1024-menu-open.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "The written tablet modal specification has no approved exact-frame visual yet."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "tablet-drawer-left",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "x",
+              "roi": [0.55, 0.05, 0.45, 0.9]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "tablet-drawer-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/modal-768x1024.json",
+              "sha256": "11b46ff48facdc9f146188958e498ca0972a6eeac45a7de022f4be360bdea280",
+              "width": 768,
+              "height": 1024
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.02,
+              "maxDiffRatio": 0.05,
+              "maxEdgeMae": 0.03
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.02,
+        "maxDiffRatio": 0.05,
+        "maxEdgeMae": 0.03
+      }
+    },
+    {
+      "id": "lp-390x844-menu-open",
+      "label": "lp-390x844-menu-open",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "route": "/",
+      "state": {
+        "id": "menu-open",
+        "setup": "open-menu",
+        "control": "button[data-fidelity-action='open-menu']"
+      },
+      "scroll": {
+        "x": 0,
+        "y": 0
+      },
+      "semanticObservation": {
+        "id": "mobile-menu-open",
+        "semantic": "menu-open",
+        "status": "approved",
+        "selector": "dialog#site-menu[open][data-state='open']",
+        "scrollStrategy": {
+          "kind": "absolute",
+          "x": 0,
+          "y": 0
+        },
+        "expected": {
+          "visible": true,
+          "stateId": "menu-open",
+          "attributes": {
+            "aria-modal": "true",
+            "data-state": "open"
+          }
+        },
+        "landmarkIds": ["mobile-drawer-left"],
+        "regionIds": ["mobile-drawer-region"],
+        "reason": "Viewport-fixed 250 px drawer contract."
+      },
+      "readiness": {
+        "selector": "dialog#site-menu[open][data-state='open']",
+        "images": "decode"
+      },
+      "capture": {
+        "fullPage": false
+      },
+      "reference": ".private/references/approved/frames/lp-390x844-menu-open.png",
+      "actualFile": "lp-390x844-menu-open.png",
+      "approvalStatus": "blocked",
+      "referenceContract": {
+        "status": "blocked",
+        "sha256": null,
+        "width": null,
+        "height": null,
+        "reason": "The written 390 px modal specification has no approved exact-frame visual yet."
+      },
+      "geometryContract": {
+        "status": "approved",
+        "executionStatus": "available",
+        "landmarks": [
+          {
+            "id": "mobile-drawer-left",
+            "status": "approved",
+            "detector": {
+              "id": "perpendicular-median-luma-edge-v2",
+              "status": "available",
+              "path": "scripts/fidelity/detectors/edge-landmark.mjs",
+              "sha256": "9d799616339692a4d6de21e2e6cba3925ea9a52011dd0ac86a5d60fea29f2b85"
+            },
+            "parameters": {
+              "axis": "x",
+              "roi": [0.25, 0.05, 0.75, 0.9]
+            },
+            "thresholds": {
+              "maxDeltaPx": 2,
+              "minConfidence": 0.04
+            }
+          }
+        ],
+        "regions": [
+          {
+            "id": "mobile-drawer-region",
+            "status": "approved",
+            "mask": {
+              "status": "available",
+              "id": "rect-region-v1",
+              "path": "config/fidelity-masks/modal-390x844.json",
+              "sha256": "80c035746c1713af09e154d3f6c8efdbf89cd76be96239f39eeb95b5548727ad",
+              "width": 390,
+              "height": 844
+            },
+            "thresholds": {
+              "pixelThreshold": 0.062745,
+              "maxAspectDelta": 0,
+              "maxMae": 0.02,
+              "maxDiffRatio": 0.05,
+              "maxEdgeMae": 0.03
+            }
+          }
+        ]
+      },
+      "thresholds": {
+        "pixelThreshold": 0.062745,
+        "maxAspectDelta": 0,
+        "maxMae": 0.02,
+        "maxDiffRatio": 0.05,
+        "maxEdgeMae": 0.03
+      }
     }
   ],
   "requiredCoverage": [
     {
       "id": "desktop-top-menu-closed",
-      "status": "blocked",
+      "status": "approved",
       "frameIds": ["lp-1440x900-menu-closed-top"],
       "observations": [
         {
           "id": "desktop-top",
-          "status": "unavailable",
+          "status": "approved",
           "frameId": "lp-1440x900-menu-closed-top",
           "semanticObservationId": "desktop-top",
           "semantic": "top",
-          "landmarkResultIds": [],
-          "regionResultIds": [],
-          "reason": "No approved detectors or masks are available for this frame."
+          "landmarkResultIds": ["desktop-canvas-left"],
+          "regionResultIds": ["desktop-top-core"]
         }
       ],
-      "reason": "Clean approved desktop exact-frame reference is missing."
+      "reason": "Contract approved; execution waits for Gate D and an exact-frame reference."
     },
     {
       "id": "desktop-root-dusk-dawn-alpine-footer",
-      "status": "blocked",
-      "frameIds": [],
+      "status": "approved",
+      "frameIds": [
+        "lp-1440x900-root",
+        "lp-1440x900-dusk",
+        "lp-1440x900-dawn",
+        "lp-1440x900-alpine",
+        "lp-1440x900-footer"
+      ],
       "observations": [
         {
           "id": "desktop-root",
-          "status": "unavailable",
-          "frameId": null,
-          "semanticObservationId": null,
+          "status": "approved",
+          "frameId": "lp-1440x900-root",
+          "semanticObservationId": "desktop-root",
           "semantic": "root",
-          "landmarkResultIds": [],
-          "regionResultIds": [],
-          "reason": "Approved ROOT scroll framing is unavailable."
+          "landmarkResultIds": ["root-mask-edge"],
+          "regionResultIds": ["root-photo-region"]
         },
         {
           "id": "desktop-dusk",
-          "status": "unavailable",
-          "frameId": null,
-          "semanticObservationId": null,
+          "status": "approved",
+          "frameId": "lp-1440x900-dusk",
+          "semanticObservationId": "desktop-dusk",
           "semantic": "dusk",
-          "landmarkResultIds": [],
-          "regionResultIds": [],
-          "reason": "Approved DUSK scroll framing is unavailable."
+          "landmarkResultIds": ["dusk-mask-edge"],
+          "regionResultIds": ["dusk-photo-region"]
         },
         {
           "id": "desktop-dawn",
-          "status": "unavailable",
-          "frameId": null,
-          "semanticObservationId": null,
+          "status": "approved",
+          "frameId": "lp-1440x900-dawn",
+          "semanticObservationId": "desktop-dawn",
           "semantic": "dawn",
-          "landmarkResultIds": [],
-          "regionResultIds": [],
-          "reason": "Approved DAWN scroll framing is unavailable."
+          "landmarkResultIds": ["dawn-mask-edge"],
+          "regionResultIds": ["dawn-photo-region"]
         },
         {
           "id": "desktop-alpine",
-          "status": "unavailable",
-          "frameId": null,
-          "semanticObservationId": null,
+          "status": "approved",
+          "frameId": "lp-1440x900-alpine",
+          "semanticObservationId": "desktop-alpine",
           "semantic": "alpine",
-          "landmarkResultIds": [],
-          "regionResultIds": [],
-          "reason": "Approved ALPINE scroll framing is unavailable."
+          "landmarkResultIds": ["alpine-mask-edge"],
+          "regionResultIds": ["alpine-photo-region"]
         },
         {
           "id": "desktop-footer",
-          "status": "unavailable",
-          "frameId": null,
-          "semanticObservationId": null,
+          "status": "approved",
+          "frameId": "lp-1440x900-footer",
+          "semanticObservationId": "desktop-footer",
           "semantic": "footer",
-          "landmarkResultIds": [],
-          "regionResultIds": [],
-          "reason": "Approved footer scroll framing is unavailable."
+          "landmarkResultIds": ["footer-rule"],
+          "regionResultIds": ["footer-core"]
         }
       ],
-      "reason": "Approved chapter scroll frames, focal anchors, landmarks, and region masks are missing."
+      "reason": "Contract approved; execution waits for Gate D and exact-frame references."
+    },
+    {
+      "id": "tablet-root-dusk-dawn-alpine-footer",
+      "status": "approved",
+      "frameIds": [
+        "lp-768x1024-root",
+        "lp-768x1024-dusk",
+        "lp-768x1024-dawn",
+        "lp-768x1024-alpine",
+        "lp-768x1024-footer"
+      ],
+      "observations": [
+        {
+          "id": "tablet-root",
+          "status": "approved",
+          "frameId": "lp-768x1024-root",
+          "semanticObservationId": "tablet-root",
+          "semantic": "root",
+          "landmarkResultIds": ["tablet-root-mask-edge"],
+          "regionResultIds": ["tablet-root-photo-region"]
+        },
+        {
+          "id": "tablet-dusk",
+          "status": "approved",
+          "frameId": "lp-768x1024-dusk",
+          "semanticObservationId": "tablet-dusk",
+          "semantic": "dusk",
+          "landmarkResultIds": ["tablet-dusk-mask-edge"],
+          "regionResultIds": ["tablet-dusk-photo-region"]
+        },
+        {
+          "id": "tablet-dawn",
+          "status": "approved",
+          "frameId": "lp-768x1024-dawn",
+          "semanticObservationId": "tablet-dawn",
+          "semantic": "dawn",
+          "landmarkResultIds": ["tablet-dawn-mask-edge"],
+          "regionResultIds": ["tablet-dawn-photo-region"]
+        },
+        {
+          "id": "tablet-alpine",
+          "status": "approved",
+          "frameId": "lp-768x1024-alpine",
+          "semanticObservationId": "tablet-alpine",
+          "semantic": "alpine",
+          "landmarkResultIds": ["tablet-alpine-mask-edge"],
+          "regionResultIds": ["tablet-alpine-photo-region"]
+        },
+        {
+          "id": "tablet-footer",
+          "status": "approved",
+          "frameId": "lp-768x1024-footer",
+          "semanticObservationId": "tablet-footer",
+          "semantic": "footer",
+          "landmarkResultIds": ["tablet-footer-rule"],
+          "regionResultIds": ["tablet-footer-core"]
+        }
+      ],
+      "reason": "Complete 768x1024 material-state coverage is configured; exact-frame references remain Gate D/E work."
+    },
+    {
+      "id": "mobile-root-dusk-dawn-alpine-footer",
+      "status": "approved",
+      "frameIds": [
+        "lp-390x844-root",
+        "lp-390x844-dusk",
+        "lp-390x844-dawn",
+        "lp-390x844-alpine",
+        "lp-390x844-footer"
+      ],
+      "observations": [
+        {
+          "id": "mobile-root",
+          "status": "approved",
+          "frameId": "lp-390x844-root",
+          "semanticObservationId": "mobile-root",
+          "semantic": "root",
+          "landmarkResultIds": ["mobile-root-mask-edge"],
+          "regionResultIds": ["mobile-root-photo-region"]
+        },
+        {
+          "id": "mobile-dusk",
+          "status": "approved",
+          "frameId": "lp-390x844-dusk",
+          "semanticObservationId": "mobile-dusk",
+          "semantic": "dusk",
+          "landmarkResultIds": ["mobile-dusk-mask-edge"],
+          "regionResultIds": ["mobile-dusk-photo-region"]
+        },
+        {
+          "id": "mobile-dawn",
+          "status": "approved",
+          "frameId": "lp-390x844-dawn",
+          "semanticObservationId": "mobile-dawn",
+          "semantic": "dawn",
+          "landmarkResultIds": ["mobile-dawn-mask-edge"],
+          "regionResultIds": ["mobile-dawn-photo-region"]
+        },
+        {
+          "id": "mobile-alpine",
+          "status": "approved",
+          "frameId": "lp-390x844-alpine",
+          "semanticObservationId": "mobile-alpine",
+          "semantic": "alpine",
+          "landmarkResultIds": ["mobile-alpine-mask-edge"],
+          "regionResultIds": ["mobile-alpine-photo-region"]
+        },
+        {
+          "id": "mobile-footer",
+          "status": "approved",
+          "frameId": "lp-390x844-footer",
+          "semanticObservationId": "mobile-footer",
+          "semantic": "footer",
+          "landmarkResultIds": ["mobile-footer-rule"],
+          "regionResultIds": ["mobile-footer-core"]
+        }
+      ],
+      "reason": "Complete 390x844 material-state coverage is configured; exact-frame references remain Gate D/E work."
     },
     {
       "id": "tablet-top-menu-closed",
-      "status": "blocked",
+      "status": "approved",
       "frameIds": ["lp-768x1024-menu-closed-top"],
       "observations": [
         {
           "id": "tablet-top",
-          "status": "unavailable",
+          "status": "approved",
           "frameId": "lp-768x1024-menu-closed-top",
           "semanticObservationId": "tablet-top",
           "semantic": "top",
-          "landmarkResultIds": [],
-          "regionResultIds": [],
-          "reason": "No approved detectors or masks are available for this frame."
+          "landmarkResultIds": ["tablet-content-left"],
+          "regionResultIds": ["tablet-top-core"]
         }
       ],
-      "reason": "Tablet composition is not approved."
+      "reason": "Written-spec coverage approved; visual approval remains Gate D/E work."
     },
     {
       "id": "mobile-top-menu-closed",
-      "status": "blocked",
+      "status": "approved",
       "frameIds": ["lp-390x844-menu-closed-top"],
       "observations": [
         {
           "id": "mobile-top",
-          "status": "unavailable",
+          "status": "approved",
           "frameId": "lp-390x844-menu-closed-top",
           "semanticObservationId": "mobile-top",
           "semantic": "top",
-          "landmarkResultIds": [],
-          "regionResultIds": [],
-          "reason": "No approved detectors or masks are available for this frame."
+          "landmarkResultIds": ["mobile-content-left"],
+          "regionResultIds": ["mobile-top-core"]
         }
       ],
-      "reason": "The 375-to-390 mapping is not approved."
+      "reason": "Written-spec coverage approved; visual approval remains Gate D/E work."
     },
     {
       "id": "menu-open-all-viewports",
-      "status": "blocked",
-      "frameIds": [],
+      "status": "approved",
+      "frameIds": [
+        "lp-1440x900-menu-open",
+        "lp-768x1024-menu-open",
+        "lp-390x844-menu-open"
+      ],
       "observations": [
         {
           "id": "desktop-menu-open",
-          "status": "unavailable",
-          "frameId": null,
-          "semanticObservationId": null,
+          "status": "approved",
+          "frameId": "lp-1440x900-menu-open",
+          "semanticObservationId": "desktop-menu-open",
           "semantic": "menu-open",
-          "landmarkResultIds": [],
-          "regionResultIds": [],
-          "reason": "Approved desktop modal frame is unavailable."
+          "landmarkResultIds": ["desktop-drawer-left"],
+          "regionResultIds": ["desktop-drawer-region"]
         },
         {
           "id": "tablet-menu-open",
-          "status": "unavailable",
-          "frameId": null,
-          "semanticObservationId": null,
+          "status": "approved",
+          "frameId": "lp-768x1024-menu-open",
+          "semanticObservationId": "tablet-menu-open",
           "semantic": "menu-open",
-          "landmarkResultIds": [],
-          "regionResultIds": [],
-          "reason": "Approved tablet modal frame is unavailable."
+          "landmarkResultIds": ["tablet-drawer-left"],
+          "regionResultIds": ["tablet-drawer-region"]
         },
         {
           "id": "mobile-menu-open",
-          "status": "unavailable",
-          "frameId": null,
-          "semanticObservationId": null,
+          "status": "approved",
+          "frameId": "lp-390x844-menu-open",
+          "semanticObservationId": "mobile-menu-open",
           "semantic": "menu-open",
-          "landmarkResultIds": [],
-          "regionResultIds": [],
-          "reason": "Approved mobile modal frame is unavailable."
+          "landmarkResultIds": ["mobile-drawer-left"],
+          "regionResultIds": ["mobile-drawer-region"]
         }
       ],
-      "reason": "Clean PC/SP modal exports and interaction states are missing."
+      "reason": "Accessible state and geometry contract approved; visual execution remains Gate D/E work."
     }
   ]
 }

@@ -25,7 +25,7 @@
     "test:e2e": "playwright test tests/e2e --project=chromium --project=firefox --project=webkit",
     "test:a11y": "playwright test tests/a11y --project=chromium --project=firefox --project=webkit",
     "test:visual": "playwright test tests/visual --project=visual-chromium",
-    "test:visual:update": "playwright test tests/visual --project=visual-chromium --update-snapshots",
+    "test:visual:update": "playwright test tests/visual --project=visual-chromium --update-snapshots=all",
     "capture:fidelity": "playwright test tests/fidelity --project=fidelity-chromium",
     "candidate:preflight": "node scripts/check-candidate-preflight.mjs",
     "test:fidelity": "node scripts/run-fidelity.mjs",

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "policy": "hash-bound-approved-production-copy",
+  "approvedValues": [
+    {
+      "path": "src/lib/moyoy-content.ts",
+      "value": "〒541-0048 大阪市中央区南船場1-11-9 4階 E号",
+      "sha256": "27ed86f836f05e711a077c61c6ff542a067a68548cd8e58d64d3e9c2964b337a",
+      "classification": "approved-production-copy",
+      "approvalStatus": "approved-public"
+    },
+    {
+      "path": "src/lib/moyoy-content.ts",
+      "value": "tel.06-7777-5945",
+      "sha256": "913957aafecadfe8b6ca8ba0b7f24d634f385a4f2c3642709175a386a962194c",
+      "classification": "approved-production-copy",
+      "approvalStatus": "approved-public"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -21,6 +22,10 @@ function evidence(path, bytes) {
   return { bytes: Buffer.from(bytes), path, size: bytes.length, source: "test" };
 }
 
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
 function git(root, args) {
   const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
@@ -33,6 +38,10 @@ async function createPolicyRepo() {
   await writeFile(
     join(root, "config/public-binary-allowlist.json"),
     `${JSON.stringify(emptyAllowlist, null, 2)}\n`,
+  );
+  await writeFile(
+    join(root, "config/public-copy-allowlist.json"),
+    `${JSON.stringify({ schemaVersion: 1, approvedValues: [] }, null, 2)}\n`,
   );
   return root;
 }
@@ -47,7 +56,12 @@ test("staged policy reads the private index blob after a benign worktree swap", 
     "BoundingBox: 0 0 10 10\nprivate payload\n",
   ].join("");
   await writeFile(join(root, "docs/note.md"), privateEps);
-  git(root, ["add", "config/public-binary-allowlist.json", "docs/note.md"]);
+  git(root, [
+    "add",
+    "config/public-binary-allowlist.json",
+    "config/public-copy-allowlist.json",
+    "docs/note.md",
+  ]);
   await writeFile(join(root, "docs/note.md"), "benign public text\n");
 
   const result = spawnSync(process.execPath, [scriptPath, "--mode=staged"], {
@@ -122,24 +136,33 @@ test("content policy rejects renamed PDF Illustrator and font/archive magic", ()
 });
 
 test("content policy rejects SVG embedded and external images", () => {
+  const lessThan = String.fromCharCode(60);
+  const svg = ["s", "v", "g"].join("");
+  const image = ["i", "m", "a", "g", "e"].join("");
+  const href = ["h", "r", "e", "f"].join("");
+  const externalScheme = ["https", "://"].join("");
+  const closeTag = ["/", svg, ">"].join("");
   const embedded = [
-    "<",
-    "svg><",
-    'image href="',
+    lessThan,
+    `${svg}>${lessThan}`,
+    `${image} ${href}=\"`,
     "data",
-    ':image/png;base64,AAAA"/></',
-    "svg>",
+    ':image/png;base64,AAAA\"/>',
+    closeTag,
   ].join("");
   const external = [
-    "<",
-    "svg><",
-    'image href="https://example.invalid/a.png"/></',
-    "svg>",
+    lessThan,
+    `${svg}>${lessThan}`,
+    `${image} ${href}=\"${externalScheme}`,
+    'example.invalid/a.png"/>',
+    closeTag,
   ].join("");
   const relativeCss = [
-    "<",
-    "svg><style>.hero{background:url(hero.png)}</style></",
-    "svg>",
+    lessThan,
+    `${svg}><style>.hero{background:`,
+    "url",
+    "(hero.png)}</style>",
+    closeTag,
   ].join("");
   for (const [index, value] of [embedded, external, relativeCss].entries()) {
     const errors = evaluatePublicRepoPolicy({
@@ -193,5 +216,74 @@ test("strict root and type policy rejects a public binary outside test baselines
     prefixCollisionErrors.some((error) =>
       error.includes("outside the strict public policy"),
     ),
+  );
+});
+
+test("hash-bound production copy allows only the approved source occurrences", () => {
+  const postalMark = String.fromCodePoint(0x3012);
+  const address = [
+    postalMark,
+    ["541", "0048"].join("-"),
+    " 大阪市中央区南船場1-11-9 4階 E号",
+  ].join("");
+  const telephone = ["tel.", ["06", "7777", "5945"].join("-")].join("");
+  const source = `${address}\n${telephone}\n`;
+  const copyAllowlist = {
+    schemaVersion: 1,
+    approvedValues: [address, telephone].map((value) => ({
+      path: "src/lib/moyoy-content.ts",
+      value,
+      sha256: sha256(value),
+      classification: "approved-production-copy",
+      approvalStatus: "approved-public",
+    })),
+  };
+  assert.deepEqual(
+    evaluatePublicRepoPolicy({
+      entries: [evidence("src/lib/moyoy-content.ts", source)],
+      allowlist: emptyAllowlist,
+      copyAllowlist,
+    }),
+    [],
+  );
+  assert.ok(
+    evaluatePublicRepoPolicy({
+      entries: [
+        evidence(
+          "src/lib/moyoy-content.ts",
+          `${source}${postalMark}${["123", "4567"].join("-")} 未承認住所\n`,
+        ),
+      ],
+      allowlist: emptyAllowlist,
+      copyAllowlist,
+    }).some((error) => error.includes("Japanese postal address marker")),
+  );
+});
+
+test("approved production SVGs use an explicit production asset allowlist class", () => {
+  const svg = Buffer.from(
+    [String.fromCharCode(60), 'svg xmlns="http://www.w3.org/2000/svg"/>'].join(""),
+  );
+  const allowlist = {
+    schemaVersion: 1,
+    approvedFiles: [
+      {
+        path: "public/assets/moyoy-candidate/vector/test.svg",
+        sha256: sha256(svg),
+        mediaType: "image/svg+xml",
+        classification: "approved-production-asset",
+        rightsStatus: "client-confirmed-production-derivative",
+        purpose: "approved production SVG",
+        approvalStatus: "approved-public",
+      },
+    ],
+  };
+  assert.deepEqual(
+    evaluatePublicRepoPolicy({
+      entries: [evidence("public/assets/moyoy-candidate/vector/test.svg", svg)],
+      allowlist,
+      requireCompleteAllowlist: true,
+    }),
+    [],
   );
 });

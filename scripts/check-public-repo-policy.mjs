@@ -14,8 +14,11 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const DOS_EPS_MAGIC = Buffer.from([0xc5, 0xd0, 0xd3, 0xc6]);
 const PDF_MAGIC = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d]);
+const WOFF2_MAGIC = Buffer.from([0x77, 0x4f, 0x46, 0x32]);
 const STRICT_BINARY_ROOT = "tests/visual/__screenshots__";
 const POLICY_PATH = "config/public-binary-allowlist.json";
+const COPY_POLICY_PATH = "config/public-copy-allowlist.json";
+const PRODUCTION_ASSET_ROOT = "public/assets/moyoy-candidate";
 
 const MASTER_EXTENSIONS = new Set([
   ".3fr",
@@ -64,6 +67,7 @@ const MASTER_EXTENSIONS = new Set([
 const ROOT_TEXT_FILES = new Set([
   ".gitattributes",
   ".gitignore",
+  ".vercelignore",
   ".npmrc",
   ".nvmrc",
   ".prettierignore",
@@ -80,6 +84,7 @@ const ROOT_TEXT_FILES = new Set([
   "postcss.config.mjs",
   "prettier.config.mjs",
   "tsconfig.json",
+  "vercel.json",
   "vitest.config.ts",
 ]);
 
@@ -270,6 +275,7 @@ export async function loadPolicyEvidence(root, mode) {
   }
 
   const trackedPaths = listGitPaths(root, ["ls-files", "--cached"]);
+  const deletedPaths = new Set(listGitPaths(root, ["ls-files", "--deleted"]));
   const untrackedPaths = listGitPaths(root, [
     "ls-files",
     "--others",
@@ -280,7 +286,9 @@ export async function loadPolicyEvidence(root, mode) {
     "--name-only",
     "--diff-filter=ACMR",
   ]);
-  for (const path of trackedPaths) entries.push(readIndexEvidence(root, path));
+  for (const path of trackedPaths) {
+    if (!deletedPaths.has(path)) entries.push(readIndexEvidence(root, path));
+  }
   for (const path of untrackedPaths) {
     entries.push(await readWorktreeEvidence(root, path, "untracked-worktree"));
   }
@@ -291,7 +299,7 @@ export async function loadPolicyEvidence(root, mode) {
 }
 
 async function readPolicyConfig(root, mode) {
-  if (indexHasPath(root, POLICY_PATH)) {
+  if (mode === "staged" && indexHasPath(root, POLICY_PATH)) {
     const evidence = readIndexEvidence(root, POLICY_PATH);
     if (!evidence.bytes) throw new Error("public binary allowlist is too large");
     return JSON.parse(evidence.bytes.toString("utf8"));
@@ -302,10 +310,26 @@ async function readPolicyConfig(root, mode) {
   return JSON.parse(await readFile(resolve(root, POLICY_PATH), "utf8"));
 }
 
+async function readCopyPolicyConfig(root, mode) {
+  if (mode === "staged" && indexHasPath(root, COPY_POLICY_PATH)) {
+    const evidence = readIndexEvidence(root, COPY_POLICY_PATH);
+    if (!evidence.bytes) throw new Error("public copy allowlist is too large");
+    return JSON.parse(evidence.bytes.toString("utf8"));
+  }
+  if (mode === "staged") {
+    throw new Error("public copy allowlist must exist in the Git index");
+  }
+  return JSON.parse(await readFile(resolve(root, COPY_POLICY_PATH), "utf8"));
+}
+
 function allowedType(path) {
   if (ROOT_TEXT_FILES.has(path)) return "text";
   if (isWithin(path, STRICT_BINARY_ROOT) && extname(path).toLowerCase() === ".png") {
     return "binary-png";
+  }
+  if (isWithin(path, PRODUCTION_ASSET_ROOT)) {
+    const extension = extname(path).toLowerCase();
+    if ([".svg", ".webp", ".woff2"].includes(extension)) return "production-asset";
   }
   for (const [root, extensions] of TEXT_ROOTS) {
     if (isWithin(path, root) && extensions.has(extname(path).toLowerCase())) {
@@ -326,10 +350,14 @@ function containsSignature(buffer, signature) {
   return buffer.subarray(0, Math.min(buffer.length, 1024)).indexOf(signature) >= 0;
 }
 
-function detectForbiddenFormat(bytes, decodedText) {
+function detectForbiddenFormat(bytes, decodedText, allowApprovedWoff2 = false) {
   // Approved PNGs are hash-bound below; their compressed chunks can contain
   // arbitrary short byte sequences that resemble unrelated format headers.
   if (startsWith(bytes, PNG_MAGIC)) return null;
+  // WOFF2 contains an internal compressed sfnt stream, so scanning its first
+  // kilobyte would otherwise misclassify it as a raw TrueType font. The exact
+  // path/hash/media-type allowlist remains mandatory below.
+  if (allowApprovedWoff2 && startsWith(bytes, WOFF2_MAGIC)) return null;
   if (containsSignature(bytes, DOS_EPS_MAGIC)) return "DOS EPS";
   if (containsSignature(bytes, PDF_MAGIC)) return "PDF/Illustrator";
   if (containsSignature(bytes, Buffer.from([0x38, 0x42, 0x50, 0x53])))
@@ -342,7 +370,10 @@ function detectForbiddenFormat(bytes, decodedText) {
     return "font collection";
   if (containsSignature(bytes, Buffer.from([0x77, 0x4f, 0x46, 0x46])))
     return "WOFF font";
-  if (containsSignature(bytes, Buffer.from([0x77, 0x4f, 0x46, 0x32])))
+  if (
+    !allowApprovedWoff2 &&
+    containsSignature(bytes, Buffer.from([0x77, 0x4f, 0x46, 0x32]))
+  )
     return "WOFF2 font";
   if (containsSignature(bytes, Buffer.from([0x50, 0x4b, 0x03, 0x04])))
     return "ZIP/source archive";
@@ -376,11 +407,77 @@ function decodeUtf8(bytes) {
   }
 }
 
-function scanText(path, text) {
+function copyEntryCoversMatch(path, text, matchIndex, matchLength, copyByPath) {
+  return (copyByPath.get(path) ?? []).some((entry) => {
+    const valueStart = text.indexOf(entry.value);
+    return (
+      valueStart >= 0 &&
+      matchIndex >= valueStart &&
+      matchIndex + matchLength <= valueStart + entry.value.length
+    );
+  });
+}
+
+export function validateCopyAllowlist(copyAllowlist) {
+  const errors = [];
+  const copyByPath = new Map();
+  if (copyAllowlist?.schemaVersion !== 1) {
+    errors.push("public copy allowlist must use schemaVersion=1");
+  }
+  if (!Array.isArray(copyAllowlist?.approvedValues)) {
+    return { errors: [...errors, "approvedValues must be an array"], copyByPath };
+  }
+  for (const entry of copyAllowlist.approvedValues) {
+    let path;
+    try {
+      path = normalizeRepoPath(entry.path);
+    } catch (error) {
+      errors.push(error.message);
+      continue;
+    }
+    if (typeof entry.value !== "string" || entry.value.length === 0) {
+      errors.push(`copy allowlist value is required: ${path}`);
+      continue;
+    }
+    if (!SHA256.test(entry.sha256 ?? "")) {
+      errors.push(`invalid copy allowlist SHA-256: ${path}`);
+    } else if (sha256Buffer(Buffer.from(entry.value, "utf8")) !== entry.sha256) {
+      errors.push(`copy allowlist SHA-256 does not match value: ${path}`);
+    }
+    if (entry.classification !== "approved-production-copy") {
+      errors.push(`copy classification is not permitted: ${path}`);
+    }
+    if (entry.approvalStatus !== "approved-public") {
+      errors.push(`copy is not approved-public: ${path}`);
+    }
+    const values = copyByPath.get(path) ?? [];
+    if (values.some((value) => value.sha256 === entry.sha256)) {
+      errors.push(`duplicate copy allowlist value: ${path}`);
+    }
+    values.push({ ...entry, path });
+    copyByPath.set(path, values);
+  }
+  return { errors, copyByPath };
+}
+
+function scanText(path, text, copyByPath) {
   const errors = [];
   for (const [label, pattern] of TEXT_SIGNATURES) {
-    pattern.lastIndex = 0;
-    if (pattern.test(text)) errors.push(`${label} detected in public text: ${path}`);
+    const globalPattern = new RegExp(
+      pattern.source,
+      `${pattern.flags.replaceAll("g", "")}g`,
+    );
+    for (const match of text.matchAll(globalPattern)) {
+      if (
+        !["Japanese postal address marker", "Japanese telephone number"].includes(
+          label,
+        ) ||
+        !copyEntryCoversMatch(path, text, match.index ?? 0, match[0].length, copyByPath)
+      ) {
+        errors.push(`${label} detected in public text: ${path}`);
+        break;
+      }
+    }
   }
   if (LONG_BASE64.test(text))
     errors.push(`large base64 payload detected in public text: ${path}`);
@@ -428,20 +525,43 @@ export function validateBinaryAllowlist(allowlist) {
       continue;
     }
     if (byPath.has(path)) errors.push(`duplicate binary allowlist path: ${path}`);
-    if (!isWithin(path, STRICT_BINARY_ROOT) || extname(path).toLowerCase() !== ".png") {
+    const isBaseline =
+      isWithin(path, STRICT_BINARY_ROOT) && extname(path).toLowerCase() === ".png";
+    const isProductionAsset = isWithin(path, PRODUCTION_ASSET_ROOT);
+    if (!isBaseline && !isProductionAsset) {
       errors.push(
-        `binary allowlist path is outside the synthetic-test root/type: ${path}`,
+        `binary allowlist path is outside the approved production roots: ${path}`,
       );
     }
     if (!SHA256.test(entry.sha256 ?? ""))
       errors.push(`invalid binary allowlist SHA-256: ${path}`);
-    if (entry.mediaType !== "image/png")
-      errors.push(`binary mediaType must be image/png: ${path}`);
-    if (entry.classification !== "synthetic-foundation-baseline") {
-      errors.push(`binary classification is not permitted: ${path}`);
+    if (isBaseline) {
+      if (entry.mediaType !== "image/png")
+        errors.push(`binary mediaType must be image/png: ${path}`);
+      if (entry.classification !== "approved-production-baseline")
+        errors.push(`binary classification is not permitted: ${path}`);
+      if (entry.rightsStatus !== "approved-public-production-candidate")
+        errors.push(`binary rightsStatus is not permitted: ${path}`);
     }
-    if (entry.rightsStatus !== "not-applicable-synthetic") {
-      errors.push(`binary rightsStatus is not permitted: ${path}`);
+    if (isProductionAsset) {
+      const extension = extname(path).toLowerCase();
+      const expectedMediaType = {
+        ".svg": "image/svg+xml",
+        ".webp": "image/webp",
+        ".woff2": "font/woff2",
+      }[extension];
+      if (entry.mediaType !== expectedMediaType)
+        errors.push(`production asset mediaType is invalid: ${path}`);
+      if (entry.classification !== "approved-production-asset")
+        errors.push(`production asset classification is not permitted: ${path}`);
+      if (
+        ![
+          "client-confirmed-production-derivative",
+          "licensed-upstream-derivative",
+        ].includes(entry.rightsStatus)
+      ) {
+        errors.push(`production asset rightsStatus is not permitted: ${path}`);
+      }
     }
     if (entry.approvalStatus !== "approved-public")
       errors.push(`binary is not approved-public: ${path}`);
@@ -454,9 +574,12 @@ export function validateBinaryAllowlist(allowlist) {
 export function evaluatePublicRepoPolicy({
   entries,
   allowlist,
+  copyAllowlist = { schemaVersion: 1, approvedValues: [] },
   requireCompleteAllowlist = false,
 }) {
   const { errors, byPath } = validateBinaryAllowlist(allowlist);
+  const copyValidation = validateCopyAllowlist(copyAllowlist);
+  errors.push(...copyValidation.errors);
   const checkedPaths = new Set();
   for (const evidence of entries) {
     let path;
@@ -488,12 +611,18 @@ export function evaluatePublicRepoPolicy({
     }
 
     const text = decodeUtf8(evidence.bytes);
-    const forbiddenFormat = detectForbiddenFormat(evidence.bytes, text);
+    const expectedType = allowedType(path);
+    const forbiddenFormat = detectForbiddenFormat(
+      evidence.bytes,
+      text,
+      expectedType === "production-asset" && extname(path).toLowerCase() === ".woff2",
+    );
     if (forbiddenFormat)
       errors.push(`${forbiddenFormat} content is forbidden: ${path}`);
-    if (text !== null) errors.push(...scanText(path, text));
+    if (text !== null && path !== COPY_POLICY_PATH) {
+      errors.push(...scanText(path, text, copyValidation.copyByPath));
+    }
 
-    const expectedType = allowedType(path);
     if (!expectedType) {
       errors.push(`path/type is outside the strict public policy: ${path}`);
       continue;
@@ -508,7 +637,13 @@ export function evaluatePublicRepoPolicy({
       errors.push(`binary path does not contain a PNG: ${path}`);
       continue;
     }
-    if (!isBinary && expectedType !== "binary-png") continue;
+    if (
+      !isBinary &&
+      expectedType !== "binary-png" &&
+      expectedType !== "production-asset"
+    ) {
+      continue;
+    }
 
     const entry = byPath.get(path);
     if (!entry) {
@@ -556,8 +691,10 @@ async function main() {
   const root = process.cwd();
   const { entries, errors: evidenceErrors } = await loadPolicyEvidence(root, mode);
   let allowlist;
+  let copyAllowlist;
   try {
     allowlist = await readPolicyConfig(root, mode);
+    copyAllowlist = await readCopyPolicyConfig(root, mode);
   } catch (error) {
     process.stderr.write(`PUBLIC REPOSITORY POLICY BLOCKED:\n- ${error.message}\n`);
     process.exitCode = 1;
@@ -568,6 +705,7 @@ async function main() {
     ...evaluatePublicRepoPolicy({
       entries,
       allowlist,
+      copyAllowlist,
       requireCompleteAllowlist: mode === "candidates",
     }),
   ];

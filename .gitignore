@@ -43,6 +43,7 @@
 .env.*
 !.env.example
 /.vercel/
+/.playwright-mcp/
 
 # Dependencies and framework output.
 /node_modules/
