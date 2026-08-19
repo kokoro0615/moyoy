@@ -68,6 +68,7 @@ const ROOT_TEXT_FILES = new Set([
   ".gitattributes",
   ".gitignore",
   ".vercelignore",
+  "src/app/icon.svg",
   ".npmrc",
   ".nvmrc",
   ".prettierignore",
