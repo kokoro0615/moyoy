@@ -133,82 +133,69 @@ for (const viewport of [
 
 /**
  * Safari 26 no longer reads `theme-color`. It colours its status bar and toolbar from the
- * `background-color` of whichever `position: fixed` element is on screen, falling back to
- * the body — which is why four always-present full-window chapter plates painted one
- * chapter's colour into both bars for the whole document. `.chrome-tint` is now the one
- * fixed layer that offers a colour, and the scroll owner points it at the surface the
- * bars are drawn over. The invariant is that the colour the browser would read matches
- * the page under the top bar; the check is a pixel read because the defect was a colour,
- * not a layout.
+ * `background-color` of whichever `position: fixed` element is nearest that edge of the
+ * window, falling back to the body — which is why four always-present full-window chapter
+ * plates painted one chapter's colour into both bars for the whole document. Two
+ * `.chrome-tint` anchors now sit at the two edges, and the scroll owner points each at the
+ * surface its own bar is drawn over. The invariant is that each anchor's colour matches
+ * the page behind its bar; the check is a pixel read because the defect was a colour, not
+ * a layout.
  */
-test("keeps the browser bar tint on the surface it is drawn over", async ({ page }) => {
+test("keeps each browser bar tinted from the surface behind it", async ({ page }) => {
   await page.setViewportSize({ height: 844, width: 390 });
   await page.goto("/", { waitUntil: "networkidle" });
 
-  // Two samples inside each surface the page presents, clear of the seams: a seam
-  // inside the window puts the two bars on different surfaces, and the recorded sweep in
-  // docs/visual-fidelity-defects.md is what covers those frames.
-  const samples = [0, 800, 2800, 3200, 3800, 4200, 4600, 5000];
-  let worst = 0;
-
-  for (const offset of samples) {
+  // Two samples inside each surface the page presents, clear of the seams: the chapter
+  // silhouettes blend two photographs there, so no single colour is the right answer and
+  // the recorded sweep in docs/visual-fidelity-defects.md is what covers those frames.
+  for (const offset of [0, 800, 2800, 3200, 3800, 4200, 4600, 5000]) {
     // The tint is written from a frame loop that sleeps when the document stops moving,
     // so the position is approached rather than jumped to: the second scroll always
     // raises an event and the loop always renders the frame this assertion reads.
     await page.evaluate((y) => window.scrollTo(0, Math.max(0, y - 8)), offset);
     await page.waitForTimeout(80);
     await page.evaluate((y) => window.scrollTo(0, y), offset);
-    // The tint is written from the scroll owner's frame loop, so the assertion waits for
-    // the value to stop moving rather than guessing how many frames that takes.
+
     let previous = "";
     let settled = 0;
     for (let attempt = 0; attempt < 60 && settled < 4; attempt += 1) {
       await page.waitForTimeout(25);
-      const current = await page.evaluate(
-        () => document.querySelector(".chrome-tint")?.getAttribute("data-tint") ?? "",
+      const current = await page.evaluate(() =>
+        [...document.querySelectorAll(".chrome-tint")]
+          .map((layer) => layer.getAttribute("data-tint") ?? "")
+          .join("|"),
       );
       settled = current === previous ? settled + 1 : 0;
       previous = current;
     }
+    // WebKit occasionally composites the new scroll position a frame or two after the
+    // value settles, and the strips below are read from the composited frame.
+    await page.waitForTimeout(400);
 
-    const tint = await page.evaluate(() => {
-      const layer = document.querySelector(".chrome-tint");
-      if (!layer) throw new Error("the chrome tint layer is missing");
-      const parts = getComputedStyle(layer).backgroundColor.match(/[\d.]+/g);
-      if (!parts) throw new Error("the chrome tint layer has no colour");
-      return parts.slice(0, 3).map(Number);
+    const tints = await page.evaluate(() => {
+      const layers = [...document.querySelectorAll(".chrome-tint")];
+      if (layers.length !== 2) throw new Error("both chrome tint anchors are required");
+      return layers.map((layer) => {
+        const parts = getComputedStyle(layer).backgroundColor.match(/[\d.]+/g);
+        if (!parts) throw new Error("a chrome tint anchor has no colour");
+        return parts.slice(0, 3).map(Number);
+      });
     });
-    // One more frame so the strips are read from the settled paint, not the one the
-    // tint was written on.
-    await page.waitForTimeout(120);
 
-    const distanceTo = async (y: number) => {
+    for (const [index, bar] of (["status bar", "toolbar"] as const).entries()) {
       const frame = await page.screenshot({
-        clip: { height: 60, width: 390, x: 0, y },
+        clip: { height: 60, width: 390, x: 0, y: index === 0 ? 0 : 784 },
       });
       const { channels } = await sharp(frame).removeAlpha().stats();
-      return Math.round(
+      const distance = Math.round(
         Math.sqrt(
-          channels.slice(0, 3).reduce((total, channel, index) => {
-            const delta = channel.mean - tint[index];
+          channels.slice(0, 3).reduce((total, channel, channelIndex) => {
+            const delta = channel.mean - tints[index][channelIndex];
             return total + delta * delta;
           }, 0),
         ),
       );
-    };
-
-    // iOS gives the status bar and the toolbar one colour between them, so where a seam
-    // crosses the window the two bars stand over different surfaces and no single colour
-    // can serve both. The guarantee is that the colour always belongs to one of them:
-    // the top bar everywhere except on the approach to the paper footer, where the
-    // reader has arrived at the footer and the bottom bar is the one that matters.
-    const nearest = Math.min(await distanceTo(0), await distanceTo(784));
-    worst = Math.max(worst, nearest);
-    expect(
-      nearest,
-      `tint vs the page under the bars at scrollY ${offset}`,
-    ).toBeLessThan(60);
+      expect(distance, `${bar} tint at scrollY ${offset}`).toBeLessThan(60);
+    }
   }
-
-  expect(worst).toBeLessThan(60);
 });

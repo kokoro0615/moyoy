@@ -27,11 +27,12 @@ const IDLE_FRAMES = 12;
 const COMPACT_WIDTH = 640;
 
 /**
- * Depth of the strip at the top of the window that a mobile browser draws its status bar
- * and address bar over. iOS reserves about 60 px for the status bar alone; this is
- * rounded up so the surface decision is taken on ink the bars actually cover.
+ * Depth of the strips a mobile browser draws its own furniture over: iOS reserves about
+ * 60 px above for the status bar and about 90 px below for the toolbar. Each bar takes
+ * the colour of the page at the middle of its own strip.
  */
-const CHROME_STRIP = 96;
+const STATUS_BAR = 60;
+const TOOL_BAR = 90;
 
 /** Widths the artboard is authored against, and above which it is zoomed. */
 const ARTBOARD_WIDTH = 1200;
@@ -212,11 +213,9 @@ export function PageMotion() {
     const paperBands: Band[] = [];
     /** The chapter elements behind `mediaBands`, index for index. */
     const chapterSections: HTMLElement[] = [];
-    /** The paper page below the last chapter. */
-    const footerBands: Band[] = [];
     let menuControl: HTMLElement | null = null;
     let themeColor: HTMLMetaElement | null = null;
-    let chromeTint: HTMLElement | null = null;
+    let chromeTints: HTMLElement[] = [];
     /** The control is `position: fixed`, so its window band is constant. */
     let menuBand: Band | null = null;
     let loopFrame = 0;
@@ -245,7 +244,6 @@ export function PageMotion() {
       mediaBands.length = 0;
       paperBands.length = 0;
       chapterSections.length = 0;
-      footerBands.length = 0;
 
       for (const plan of contourPlan) {
         const stack = document.querySelector<HTMLElement>(plan.selector);
@@ -297,7 +295,7 @@ export function PageMotion() {
 
       menuControl = document.querySelector<HTMLElement>(".menu-open-button");
       themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-      chromeTint = document.querySelector<HTMLElement>(".chrome-tint");
+      chromeTints = [...document.querySelectorAll<HTMLElement>(".chrome-tint")];
     }
 
     function reset() {
@@ -349,13 +347,6 @@ export function PageMotion() {
         const box = chapter.getBoundingClientRect();
         mediaBands.push({ bottom: box.bottom + scrollY, top: box.top + scrollY });
         chapterSections.push(chapter);
-      }
-
-      for (const element of document.querySelectorAll<HTMLElement>(
-        'footer[data-fidelity="footer"]',
-      )) {
-        const box = element.getBoundingClientRect();
-        footerBands.push({ bottom: box.bottom + scrollY, top: box.top + scrollY });
       }
 
       // The ROOT chapter box starts about 260 px above the photograph the reader sees:
@@ -415,48 +406,44 @@ export function PageMotion() {
      * of the band at the top of each photograph, which is not the photograph's own mean
      * wherever the frame opens on sky. Over the paper page it is the paper.
      *
-     * The strip the bars occupy is short, so the decision is taken on the top of the
-     * window rather than on the whole of it: that is where the status bar sits, it is the
-     * one bar iOS never collapses, and the mobile plate pans only a few per cent of its
-     * frame, so that band stays the same colour for the whole chapter.
+     * Safari reads a fixed element for the nearest bar only when it sits within 4 px of
+     * the top or 3 px of the bottom of the window, so the two anchors are sampled
+     * independently and each bar gets the colour of the surface it is actually drawn
+     * over — including where a seam crosses the window and the two disagree.
      */
     function renderChromeSurface(scrollY: number) {
-      const top = scrollY;
-      const bottom = scrollY + Math.min(CHROME_STRIP, window.innerHeight);
-      const overlaps = (band: Band) => band.top < bottom && band.bottom > top;
-      // The two bars take one colour between them, so they can only disagree where a
-      // seam crosses the window. The page has one such seam that matters — the last
-      // chapter into the paper footer — and there the reader has arrived at the footer,
-      // which fills most of the window and sits under the bottom bar. Paper wins that
-      // one; the ALPINE frame above it is a pale sky, so the status bar barely parts
-      // from it. Everywhere else the top of the window decides.
-      const footerTop = scrollY + window.innerHeight - CHROME_STRIP;
-      const footerBottom = scrollY + window.innerHeight;
-      const bottomOnPaper = footerBands.some(
-        (band) => band.top < footerBottom && band.bottom > footerTop,
-      );
-      let active: HTMLElement | null = null;
-      if (!bottomOnPaper) {
-        // Chapters overlap at their seams and the earlier one holds the higher
-        // `z-index`, so the first match is the one actually painting at the window top.
+      const height = window.innerHeight;
+      // One point per bar, at the middle of the strip it covers, rather than any overlap
+      // with it: a band that reaches three pixels into the strip is not the surface the
+      // bar is drawn over, and taking the midpoint is what keeps the colour from turning
+      // a whole window early. Chapters overlap at their seams and the earlier one holds
+      // the higher `z-index`, so the first match is the one painting at that point.
+      const surfaceAt = (point: number) => {
         for (const [index, band] of mediaBands.entries()) {
-          if (!overlaps(band)) continue;
-          active = chapterSections[index] ?? null;
-          break;
+          if (band.top > point || band.bottom <= point) continue;
+          return chapterSections[index] ?? null;
         }
-      }
+        return null;
+      };
+      const read = (section: HTMLElement | null, property: string) =>
+        section
+          ? getComputedStyle(section).getPropertyValue(property).trim() || paperTint
+          : paperTint;
 
-      const tint = active
-        ? getComputedStyle(active).getPropertyValue("--chapter-chrome").trim() ||
-          paperTint
-        : paperTint;
+      const topTint = read(surfaceAt(scrollY + STATUS_BAR / 2), "--chapter-chrome");
+      const bottomTint = read(
+        surfaceAt(scrollY + height - TOOL_BAR / 2),
+        "--chapter-chrome-end",
+      );
 
-      if (chromeTint && chromeTint.dataset.tint !== tint) {
-        chromeTint.dataset.tint = tint;
-        chromeTint.style.setProperty("--chrome-tint", tint);
+      for (const layer of chromeTints) {
+        const next = layer.dataset.edge === "bottom" ? bottomTint : topTint;
+        if (layer.dataset.tint === next) continue;
+        layer.dataset.tint = next;
+        layer.style.setProperty("--chrome-tint", next);
       }
-      // Chrome, Edge and iOS before 26 still honour the meta, so it is kept in step.
-      if (themeColor && themeColor.content !== tint) themeColor.content = tint;
+      // Chrome, Edge and iOS before 26 still honour the meta, and it colours one bar.
+      if (themeColor && themeColor.content !== topTint) themeColor.content = topTint;
     }
 
     function render() {

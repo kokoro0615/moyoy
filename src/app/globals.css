@@ -492,6 +492,7 @@ main[data-page="moyoy-lp"] {
 .chapter-root {
   --chapter-tone: #12281d;
   --chapter-chrome: #13261e;
+  --chapter-chrome-end: #142c1f;
 
   z-index: 9;
   top: 2295px;
@@ -501,6 +502,7 @@ main[data-page="moyoy-lp"] {
 .chapter-dusk {
   --chapter-tone: #6b442c;
   --chapter-chrome: #cf948b;
+  --chapter-chrome-end: #331e11;
 
   z-index: 8;
   top: 3895px;
@@ -510,6 +512,7 @@ main[data-page="moyoy-lp"] {
 .chapter-dawn {
   --chapter-tone: #42633e;
   --chapter-chrome: #426043;
+  --chapter-chrome-end: #537a46;
 
   z-index: 7;
   top: 5495px;
@@ -519,6 +522,7 @@ main[data-page="moyoy-lp"] {
 .chapter-alpine {
   --chapter-tone: #779fa4;
   --chapter-chrome: #85c4d0;
+  --chapter-chrome-end: #6a8e95;
 
   z-index: 6;
   top: 7095px;
@@ -583,9 +587,24 @@ main[data-page="moyoy-lp"] {
 .chrome-tint {
   position: fixed;
   z-index: -1;
-  inset: 0;
+  left: 0;
+  width: 100%;
+  /* Safari reads a fixed element for the nearest bar only when it sits within 4 px of
+     the top or 3 px of the bottom, spans at least 80 % of the width and is at least 3 px
+     high. Two anchors that each satisfy that at their own edge give the status bar and
+     the toolbar their own colour, so a window showing two surfaces no longer has to
+     choose one. Both sit at `z-index: -1`, below the opaque canvas, and are invisible. */
+  height: 4px;
   background-color: var(--chrome-tint, var(--paper));
   pointer-events: none;
+}
+
+.chrome-tint[data-edge="top"] {
+  top: 0;
+}
+
+.chrome-tint[data-edge="bottom"] {
+  bottom: 0;
 }
 
 .chapter-photo-pin picture {
@@ -1407,18 +1426,22 @@ footer[data-fidelity="footer"] {
      whole chapter. Measured from the shipped assets over the top 8 % of each. */
   .chapter-root {
     --chapter-chrome: #1f3e2f;
+    --chapter-chrome-end: #16251c;
   }
 
   .chapter-dusk {
     --chapter-chrome: #9288b3;
+    --chapter-chrome-end: #243b2c;
   }
 
   .chapter-dawn {
     --chapter-chrome: #3e5d40;
+    --chapter-chrome-end: #32462b;
   }
 
   .chapter-alpine {
     --chapter-chrome: #69adcc;
+    --chapter-chrome-end: #a6c3c0;
   }
 
   .chapter-root .chapter-photo {

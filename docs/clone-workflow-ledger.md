@@ -302,6 +302,7 @@ to the body colour rather than removing the band.
 | Item | State |
 | --- | --- |
 | VF-41 on the owner's device | corrected and swept in WebKit under Playwright, which is not iOS Safari; **a device re-check is required to close it** |
-| One colour for two bars | a platform limit; the toolbar parts from its surface across the four seam crossings. A WebKit fix is reported as expected in iOS 26.2 |
+| One colour for two bars | resolved: Safari samples the element nearest each bar, so two 4 px anchors give the status bar and the toolbar their own colour. What remains is the four chapter seams, where the mask is blending two photographs and no single colour is right for either bar |
+| Transparent bars | not available to a page: the glass appears only when Safari finds no colour at all, and the body background is always a fallback. A WebKit fix is reported as expected in iOS 26.2 |
 | WebKit / mobile-context visual baselines | still absent |
 | `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |

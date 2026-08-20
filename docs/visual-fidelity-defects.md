@@ -356,16 +356,28 @@ Worst ΔE between the colour the browser would read and the page under each bar:
 | Status bar (top) | ≤ 25 across the document, 96–190 at two single-sample seam frames | the frames where the seam between two surfaces is inside the bar itself |
 | Toolbar (bottom) | ≤ 39 wherever both bars stand on one surface | parts on the seam crossings, below |
 
-### The limit that remains, and why it is a limit
+### The two bars are sampled separately, so they do not share a colour
 
-iOS gives the two bars **one** colour between them. Wherever a seam is inside the window
-the two bars stand on different surfaces and no single value can serve both — including
-inside a single chapter, because the DUSK frame opens on a lavender sky and closes on dark
-ground. The rule adopted here gives the colour to the status bar, which iOS never
-collapses, except on the approach to the paper footer, where the reader has arrived at the
-footer and the toolbar is the bar that matters. The measured cost is the toolbar parting
-from its surface across four seam crossings, roughly 29 % of the scroll range. A WebKit
-fix for the underlying behaviour is reported as expected in iOS 26.2.
+Safari reads a fixed element for the **nearest** bar, and only when that element sits
+within 4 px of the top or 3 px of the bottom of the window, spans at least 80 % of the
+width and is at least 3 px high. One full-window layer therefore served both bars with one
+colour; two 4 px anchors, one at each edge, give each bar the surface it is actually drawn
+over. Each is pointed at the colour of the page at the **middle of its own strip** — 60 px
+for the status bar, 90 px for the toolbar — rather than at anything that merely overlaps
+it, which is what kept the colour from turning a whole window early.
+
+The remaining mismatches are the four chapter seams, where the silhouette mask is blending
+two photographs and no single colour is the right answer for either bar. Measured every
+100 px across the document, six of 59 samples exceed ΔE 60 on one bar; before the split,
+the toolbar was wrong across whole chapters. A WebKit fix for the underlying behaviour is
+reported as expected in iOS 26.2.
+
+### Transparency is not something a page can ask for
+
+The bars are translucent only when Safari finds no colour to use. Any qualifying fixed
+element supplies one, and the body's background is the fallback — which is exactly what
+produced the paper-coloured bands the owner reported after VF-40. A page cannot request
+the glass; it can only choose the colour Safari paints, which is what this does.
 
 ### Gate status
 
