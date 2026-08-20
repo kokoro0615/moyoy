@@ -130,3 +130,85 @@ for (const viewport of [
     expect(blue, `${viewport.label} blue`).toBeGreaterThan(180);
   });
 }
+
+/**
+ * Safari 26 no longer reads `theme-color`. It colours its status bar and toolbar from the
+ * `background-color` of whichever `position: fixed` element is on screen, falling back to
+ * the body — which is why four always-present full-window chapter plates painted one
+ * chapter's colour into both bars for the whole document. `.chrome-tint` is now the one
+ * fixed layer that offers a colour, and the scroll owner points it at the surface the
+ * bars are drawn over. The invariant is that the colour the browser would read matches
+ * the page under the top bar; the check is a pixel read because the defect was a colour,
+ * not a layout.
+ */
+test("keeps the browser bar tint on the surface it is drawn over", async ({ page }) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.goto("/", { waitUntil: "networkidle" });
+
+  // Two samples inside each surface the page presents, clear of the seams: a seam
+  // inside the window puts the two bars on different surfaces, and the recorded sweep in
+  // docs/visual-fidelity-defects.md is what covers those frames.
+  const samples = [0, 800, 2800, 3200, 3800, 4200, 4600, 5000];
+  let worst = 0;
+
+  for (const offset of samples) {
+    // The tint is written from a frame loop that sleeps when the document stops moving,
+    // so the position is approached rather than jumped to: the second scroll always
+    // raises an event and the loop always renders the frame this assertion reads.
+    await page.evaluate((y) => window.scrollTo(0, Math.max(0, y - 8)), offset);
+    await page.waitForTimeout(80);
+    await page.evaluate((y) => window.scrollTo(0, y), offset);
+    // The tint is written from the scroll owner's frame loop, so the assertion waits for
+    // the value to stop moving rather than guessing how many frames that takes.
+    let previous = "";
+    let settled = 0;
+    for (let attempt = 0; attempt < 60 && settled < 4; attempt += 1) {
+      await page.waitForTimeout(25);
+      const current = await page.evaluate(
+        () => document.querySelector(".chrome-tint")?.getAttribute("data-tint") ?? "",
+      );
+      settled = current === previous ? settled + 1 : 0;
+      previous = current;
+    }
+
+    const tint = await page.evaluate(() => {
+      const layer = document.querySelector(".chrome-tint");
+      if (!layer) throw new Error("the chrome tint layer is missing");
+      const parts = getComputedStyle(layer).backgroundColor.match(/[\d.]+/g);
+      if (!parts) throw new Error("the chrome tint layer has no colour");
+      return parts.slice(0, 3).map(Number);
+    });
+    // One more frame so the strips are read from the settled paint, not the one the
+    // tint was written on.
+    await page.waitForTimeout(120);
+
+    const distanceTo = async (y: number) => {
+      const frame = await page.screenshot({
+        clip: { height: 60, width: 390, x: 0, y },
+      });
+      const { channels } = await sharp(frame).removeAlpha().stats();
+      return Math.round(
+        Math.sqrt(
+          channels.slice(0, 3).reduce((total, channel, index) => {
+            const delta = channel.mean - tint[index];
+            return total + delta * delta;
+          }, 0),
+        ),
+      );
+    };
+
+    // iOS gives the status bar and the toolbar one colour between them, so where a seam
+    // crosses the window the two bars stand over different surfaces and no single colour
+    // can serve both. The guarantee is that the colour always belongs to one of them:
+    // the top bar everywhere except on the approach to the paper footer, where the
+    // reader has arrived at the footer and the bottom bar is the one that matters.
+    const nearest = Math.min(await distanceTo(0), await distanceTo(784));
+    worst = Math.max(worst, nearest);
+    expect(
+      nearest,
+      `tint vs the page under the bars at scrollY ${offset}`,
+    ).toBeLessThan(60);
+  }
+
+  expect(worst).toBeLessThan(60);
+});

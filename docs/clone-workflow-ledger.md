@@ -273,3 +273,35 @@ by the workflow was exercised through `pnpm test:e2e` on all three engines and
 | WebKit / mobile-context visual baselines | still absent; the two new checks are targeted invariants, not a Safari fidelity baseline |
 | `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
 | Contour line weight, motion amplitude, drawer timing, Instagram mark, SP product copy residuals | unchanged |
+
+## 2026-08-20 fourth session — the iOS 26 browser bar tint
+
+- **Mode:** unchanged (authorized client rebuild; existing-product defect fix).
+- **Production owner:** unchanged — the main conversation.
+- **In scope:** one owner-reported defect (VF-41) — the top and bottom bands return as
+  soon as the ROOT photograph reaches the window. The left/right gutters (VF-39) were
+  confirmed corrected on the device.
+- **Out of scope, unchanged:** everything recorded in the previous three sessions.
+
+### Reference and rights
+
+No new target site was visited and no asset was downloaded. No production asset changed;
+the per-chapter tint values were measured from the shipped photographs already in the
+repository.
+
+### Root cause
+
+Safari 26 ignores `theme-color` and takes the browser UI tint from the `background-color`
+of on-screen `position: fixed` / `sticky` elements, falling back to the body. The four
+full-window fixed chapter plates were that source. The previous session's `theme-color`
+was inert on the owner's device, and its `clip-path` moved the tint from a chapter colour
+to the body colour rather than removing the band.
+
+### Still unresolved after this session
+
+| Item | State |
+| --- | --- |
+| VF-41 on the owner's device | corrected and swept in WebKit under Playwright, which is not iOS Safari; **a device re-check is required to close it** |
+| One colour for two bars | a platform limit; the toolbar parts from its surface across the four seam crossings. A WebKit fix is reported as expected in iOS 26.2 |
+| WebKit / mobile-context visual baselines | still absent |
+| `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |

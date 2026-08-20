@@ -52,7 +52,10 @@
   --menu-item-travel: 26px;
 
   color: var(--ink);
-  background: #d8d5cc;
+  /* Invisible on the page — `.page-canvas` covers the document from edge to edge — but
+     Safari 26 reads the root/body background when no fixed element offers a tint, and iOS
+     paints it in the overscroll rubber band. Both must be the ground the reader sees. */
+  background: var(--paper);
   font-family: var(--japanese);
   font-weight: 400;
   font-synthesis: none;
@@ -102,14 +105,14 @@
 html {
   min-width: 320px;
   overflow-x: clip;
-  background: #d8d5cc;
+  background: var(--paper);
 }
 
 body {
   min-height: 100dvh;
   margin: 0;
   overflow-x: clip;
-  background: #d8d5cc;
+  background: var(--paper);
 }
 
 body.menu-locked {
@@ -488,6 +491,7 @@ main[data-page="moyoy-lp"] {
    fixed plate so an undecoded frame still reads as the chapter. */
 .chapter-root {
   --chapter-tone: #12281d;
+  --chapter-chrome: #13261e;
 
   z-index: 9;
   top: 2295px;
@@ -496,6 +500,7 @@ main[data-page="moyoy-lp"] {
 
 .chapter-dusk {
   --chapter-tone: #6b442c;
+  --chapter-chrome: #cf948b;
 
   z-index: 8;
   top: 3895px;
@@ -504,6 +509,7 @@ main[data-page="moyoy-lp"] {
 
 .chapter-dawn {
   --chapter-tone: #42633e;
+  --chapter-chrome: #426043;
 
   z-index: 7;
   top: 5495px;
@@ -512,6 +518,7 @@ main[data-page="moyoy-lp"] {
 
 .chapter-alpine {
   --chapter-tone: #779fa4;
+  --chapter-chrome: #85c4d0;
 
   z-index: 6;
   top: 7095px;
@@ -536,6 +543,14 @@ main[data-page="moyoy-lp"] {
      not become the containing block for a fixed descendant, so the pin below stays
      viewport-fixed. Verified in WebKit and Chromium at 390 and 1440. */
   clip-path: inset(0);
+  /* The undecoded-frame fallback lives here, on an absolutely positioned box, rather
+     than on the fixed plate inside. Visually the two are the same — the mask confines
+     both to the silhouette — but Safari 26 derives its toolbar tint from the
+     `background-color` of `position: fixed` elements near the window edges and never
+     from an absolutely positioned one, and all four plates are present at every scroll
+     position. With the tone on the plate the browser painted one chapter's colour into
+     the status bar and toolbar for the whole document, including over the paper page. */
+  background: var(--chapter-tone, var(--ink));
   -webkit-mask-position: center top;
   mask-position: center top;
   -webkit-mask-repeat: no-repeat;
@@ -555,7 +570,22 @@ main[data-page="moyoy-lp"] {
   position: fixed;
   inset: 0;
   overflow: clip;
-  background: var(--chapter-tone, var(--ink));
+}
+
+/* Safari 26 tints its status bar and toolbar from the `background-color` of whichever
+   `position: fixed` element is on screen, falling back to the body — it no longer reads
+   `theme-color` at all. The plates cannot be that source: they are clipped by the window
+   above, which takes them out of the browser's reckoning, and all four are present at
+   every scroll position anyway. One dedicated fixed layer carries the tint instead. It
+   is painted at `z-index: -1`, below the opaque paper canvas, so nothing about the page
+   changes; only the browser reads it. The scroll owner points `--chrome-tint` at the
+   surface the bars are drawn over, and the paper page is the no-JavaScript floor. */
+.chrome-tint {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  background-color: var(--chrome-tint, var(--paper));
+  pointer-events: none;
 }
 
 .chapter-photo-pin picture {
@@ -1370,6 +1400,25 @@ footer[data-fidelity="footer"] {
   .scroll-indicator {
     top: max(360px, min(602.8px, calc(var(--first-view-height) - 64.2px)));
     left: 172.9px;
+  }
+
+  /* The SP crops are their own photographs and the mobile plate pans only ~7 % of the
+     frame, so the band the browser bars are drawn over is the top of the SP file for the
+     whole chapter. Measured from the shipped assets over the top 8 % of each. */
+  .chapter-root {
+    --chapter-chrome: #1f3e2f;
+  }
+
+  .chapter-dusk {
+    --chapter-chrome: #9288b3;
+  }
+
+  .chapter-dawn {
+    --chapter-chrome: #3e5d40;
+  }
+
+  .chapter-alpine {
+    --chapter-chrome: #69adcc;
   }
 
   .chapter-root .chapter-photo {

@@ -87,6 +87,10 @@ export function SiteMenu({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <>
       <div data-app-shell ref={appShellRef}>
+        {/* Safari 26 colours its status bar and toolbar from a `position: fixed` layer
+            rather than from `theme-color`; this is that layer. It paints below the page
+            and is invisible to the reader. See `.chrome-tint` in globals.css. */}
+        <div aria-hidden="true" className="chrome-tint" />
         {children}
         <button
           aria-label="メニューを開く"

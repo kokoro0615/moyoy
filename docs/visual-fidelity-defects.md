@@ -54,6 +54,7 @@ asset existence, build success, or implementation-authored regression snapshots.
 | VF-38 | parallax coverage across the whole line system | Owner review: is the parallax actually applied to every background line, and does each object really offset from its neighbours? | audited by reading the rendered transform of every decorative element at nine scroll positions. Two real gaps. **(a) Three elements never moved at all:** the brand header rule, the brand footer rule — the two longest lines on the page — and the ROOT upper foreground. The two brand rules now drift with the rest of the line system, each anchored so the frame the reference approves is the frame that holds still (the header starts at its authored offset because the approved composition is the page top; the footer arrives at its authored offset because the approved composition is the page end). The ROOT foreground stays fixed and is the one documented exception: it is the seam between the paper page and the first photograph, its position is the measured VF-11 value, and it is also the signal VF-35b uses to know which surface is behind the control. **(b) Two of the four hero contour lines were moving invisibly.** Measuring each layer's own geometry shows hero layers 3 and 4 are vertically oriented (bounding boxes 388 × 801 and 435 × 709), and a vertical translation of a vertical line only slides the line along itself. Those two layers, and the product stack's small closed form, now carry a horizontal component perpendicular to their own direction, so the displacement is visible rather than merely present. Re-audited after: every element except the ROOT foreground changes on every band it crosses | CORRECTED — 9-POSITION AUDIT AT 1440 × 900; PENDING HUMAN REVIEW |
 | VF-39 | every viewport, Safari / iOS Safari only | Owner review on a physical iPhone (390 × 844): the page keeps a blank margin at both edges all the way to the end of the document and the composition is broken | both artboards resolve their authored canvas against the window with `zoom`, and the ratio was computed in CSS as `tan(atan2(100vw, 375px))` / `tan(atan2(100vw, 1200px))` — the only construct on the page whose implementations still disagree. `atan2()` over two lengths in **different units** is unspecified (w3c/csswg-drafts#7482) and shipping WebKit does not return the ratio, so `zoom` is invalid at computed-value time and falls back to `1`. The artboard then renders at its authored **375 px** (SP) / **1200 px** (PC) width and the base rule's `margin-inline: auto` centres it: a 7.5 px paper gutter down both edges of a 390 px phone, 27.5 px on a 430 px phone, 120 px on a 1440 px Safari window — and the whole composition 4 %–20 % off the frame it was measured against. The same ratio feeds `--first-view-height` and the scroll controller, so the scroll cue and every parallax offset were wrong with it. Measured on the owner's frame: the wordmark ink ends at 0.691 of the window against the approved 0.7067, i.e. exactly the 375/390 ratio. The ratio is now written as a plain number by a render-blocking head script before the first paint, and the CSS path registers the viewport width as a `<length>` so both `atan2()` arguments arrive in the same unit. Verified in Chromium, Firefox and WebKit at 360/375/390/402/430/639/720/768/1200/1440/2560: artboard left edge 0, artboard width = window width | CORRECTED — 11 WIDTHS × 3 ENGINES; PENDING HUMAN REVIEW ON DEVICE |
 | VF-40 | page top and page end, Safari / iOS Safari only | Owner review on a physical iPhone: a dark green band above the status bar and below the browser toolbar | DA-MEDIA-01 pins each chapter photograph with a real `position: fixed` plate inside a masked silhouette window, and the plate is backed by `--chapter-tone`. WebKit stops applying the ancestor mask to that composited layer once the window scrolls out of view: reproduced in WebKit at 390 × 844 and 1440 × 900, where the ROOT photograph paints across the paper hero — the hero clip reads mean rgb(20, 46, 32) against Chromium's rgb(231, 226, 211). ROOT holds the highest chapter `z-index`, and its tone `#12281d` is the green the owner photographed. With `viewport-fit=cover` the fixed plate also extends into the strips iOS Safari draws its toolbars over, which is where the escape stays visible on the device. The window now carries an explicit `clip-path: inset(0)` — a geometric clip WebKit does apply to the composited layer, and, unlike `transform`, `filter` or `contain: paint`, one that does not become the containing block for a fixed descendant, so the plate stays viewport-fixed (pin rect measured at 0/844 at three scroll positions in both engines, unchanged). The browser UI tint is additionally stated as `theme-color: #ece7d8` instead of being sampled from the page. Measured after: WebKit hero clip rgb(231, 226, 211) at 390, rgb(235, 230, 215) at 1440 — identical to Chromium | CORRECTED — MEASURED IN WEBKIT AND CHROMIUM AT 390 AND 1440; PENDING HUMAN REVIEW ON DEVICE |
+| VF-41 | page top and page end, iOS 26 Safari | Owner review after VF-40 shipped: the left/right gutters are gone, but the top and bottom bands return as soon as the ROOT photograph reaches the window — now the paper colour rather than green | **VF-40's diagnosis was incomplete and its `theme-color` half was inert.** Safari 26 no longer reads `theme-color` at all: it parses the tag and discards the value. It derives the tint of the status bar and the toolbar from the `background-color` of whichever `position: fixed` or `sticky` element is on screen, and falls back to the body. This page carries four full-window `position: fixed` chapter plates backed by `--chapter-tone`, present at every scroll position — which is why the browser painted ROOT's `#12281d` into both bars for the whole document, over the paper page as much as over its own photograph. VF-40's `clip-path` took the plates out of the browser's reckoning, so the tint fell through to the body's `#d8d5cc` and the same bands came back in light grey. Three changes: the undecoded-frame tone moves from the fixed plate onto the absolutely positioned masked window, which Safari never samples and where it is visually identical; the root and body ground becomes the paper the reader actually sees, so the no-JavaScript floor and the overscroll rubber band match the page; and one dedicated fixed layer at `z-index: -1`, invisible behind the opaque canvas, carries the tint, pointed by the scroll owner at the surface the bars are drawn over. The colour is `--chapter-chrome`, the measured mean of the band at the top of each photograph — not the photograph's own mean, which is a different colour wherever the frame opens on sky (DUSK's mean is `#6b442c`; the band under the status bar is `#9288b3`). Swept every 100 px across the whole document in WebKit at 390 × 844: the tint parts from the page under the top bar by ΔE ≤ 25 everywhere except two single-sample seam frames | CORRECTED — FULL-DOCUMENT SWEEP AT 390 × 844; PENDING HUMAN REVIEW ON DEVICE |
 
 ## Closure evidence
 
@@ -329,3 +330,48 @@ three scroll positions in both engines with and without the clip: identical, `0 
   fidelity in general.
 - Both corrections are verified in WebKit 26.5 under Playwright, which is **not** iOS
   Safari. Only a re-check on the owner's device closes VF-39 and VF-40.
+
+## 2026-08-20 fourth owner-review pass — the iOS 26 browser bar tint
+
+### What was actually wrong
+
+`theme-color` has not driven the iOS Safari UI since Safari 26. The tint comes from the
+`background-color` of the `position: fixed` / `position: sticky` elements on screen, with
+the body as the fallback — so a page whose art direction is carried by full-window fixed
+plates hands the browser one of those plate colours for the entire document. Every
+symptom the owner reported follows from that single rule:
+
+| State | Tint the browser read | What the reader saw |
+| --- | --- | --- |
+| Before VF-40 | ROOT plate `#12281d` (highest chapter `z-index`, always on screen) | green bands over the paper hero |
+| After VF-40 | body `#d8d5cc` — the plates are clipped and no longer offered | paper-coloured bands over the ROOT photograph |
+| Now | `.chrome-tint`, pointed at the surface under the bars | the bar colour is the page colour |
+
+### Full-document sweep, WebKit 26.5 at 390 × 844, every 100 px
+
+Worst ΔE between the colour the browser would read and the page under each bar:
+
+| Bar | Worst ΔE | Where |
+| --- | --- | --- |
+| Status bar (top) | ≤ 25 across the document, 96–190 at two single-sample seam frames | the frames where the seam between two surfaces is inside the bar itself |
+| Toolbar (bottom) | ≤ 39 wherever both bars stand on one surface | parts on the seam crossings, below |
+
+### The limit that remains, and why it is a limit
+
+iOS gives the two bars **one** colour between them. Wherever a seam is inside the window
+the two bars stand on different surfaces and no single value can serve both — including
+inside a single chapter, because the DUSK frame opens on a lavender sky and closes on dark
+ground. The rule adopted here gives the colour to the status bar, which iOS never
+collapses, except on the approach to the paper footer, where the reader has arrived at the
+footer and the toolbar is the bar that matters. The measured cost is the toolbar parting
+from its surface across four seam crossings, roughly 29 % of the scroll range. A WebKit
+fix for the underlying behaviour is reported as expected in iOS 26.2.
+
+### Gate status
+
+| Gate | Result |
+| --- | --- |
+| `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | PASS |
+| `pnpm test:e2e` (Chromium 151 / Firefox 153 / WebKit 26.5) | PASS — includes the new tint invariant on all three engines |
+| `pnpm test:visual` | PASS — 21 baselines unchanged, so the tint layer is provably invisible |
+| `pnpm test:a11y` | PASS |

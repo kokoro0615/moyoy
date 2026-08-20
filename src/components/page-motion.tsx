@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import { paperTint } from "@/lib/implementation-contract";
+
 /**
  * Single owner for every scroll-linked transform on the landing page.
  *
@@ -23,6 +25,13 @@ const IDLE_FRAMES = 12;
 
 /** Viewport width below which the compact travels apply. */
 const COMPACT_WIDTH = 640;
+
+/**
+ * Depth of the strip at the top of the window that a mobile browser draws its status bar
+ * and address bar over. iOS reserves about 60 px for the status bar alone; this is
+ * rounded up so the surface decision is taken on ink the bars actually cover.
+ */
+const CHROME_STRIP = 96;
 
 /** Widths the artboard is authored against, and above which it is zoomed. */
 const ARTBOARD_WIDTH = 1200;
@@ -201,7 +210,13 @@ export function PageMotion() {
     const mediaBands: Band[] = [];
     /** Paper artwork that is painted over a chapter and hides the photograph behind it. */
     const paperBands: Band[] = [];
+    /** The chapter elements behind `mediaBands`, index for index. */
+    const chapterSections: HTMLElement[] = [];
+    /** The paper page below the last chapter. */
+    const footerBands: Band[] = [];
     let menuControl: HTMLElement | null = null;
+    let themeColor: HTMLMetaElement | null = null;
+    let chromeTint: HTMLElement | null = null;
     /** The control is `position: fixed`, so its window band is constant. */
     let menuBand: Band | null = null;
     let loopFrame = 0;
@@ -229,6 +244,8 @@ export function PageMotion() {
       pans.length = 0;
       mediaBands.length = 0;
       paperBands.length = 0;
+      chapterSections.length = 0;
+      footerBands.length = 0;
 
       for (const plan of contourPlan) {
         const stack = document.querySelector<HTMLElement>(plan.selector);
@@ -279,6 +296,8 @@ export function PageMotion() {
       }
 
       menuControl = document.querySelector<HTMLElement>(".menu-open-button");
+      themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+      chromeTint = document.querySelector<HTMLElement>(".chrome-tint");
     }
 
     function reset() {
@@ -329,6 +348,14 @@ export function PageMotion() {
       for (const chapter of document.querySelectorAll<HTMLElement>("[data-chapter]")) {
         const box = chapter.getBoundingClientRect();
         mediaBands.push({ bottom: box.bottom + scrollY, top: box.top + scrollY });
+        chapterSections.push(chapter);
+      }
+
+      for (const element of document.querySelectorAll<HTMLElement>(
+        'footer[data-fidelity="footer"]',
+      )) {
+        const box = element.getBoundingClientRect();
+        footerBands.push({ bottom: box.bottom + scrollY, top: box.top + scrollY });
       }
 
       // The ROOT chapter box starts about 260 px above the photograph the reader sees:
@@ -375,9 +402,67 @@ export function PageMotion() {
       if (menuControl.dataset.overMedia !== next) menuControl.dataset.overMedia = next;
     }
 
+    /**
+     * Safari 26 no longer reads `theme-color`. It derives the tint of the status bar and
+     * the toolbar from the `background-color` of the `position: fixed` elements nearest
+     * the window edges, and this page has four full-window fixed chapter plates that are
+     * present at every scroll position — so one chapter's colour was painted into both
+     * bars for the whole document, over the paper page as much as over its own
+     * photograph. The plates carry no colour at all now — they are clipped by their own
+     * window, which takes them out of the browser's reckoning anyway — and one dedicated
+     * fixed layer behind the page carries the tint instead. This points that layer at the
+     * surface the bars are actually drawn over: `--chapter-chrome` is the measured mean
+     * of the band at the top of each photograph, which is not the photograph's own mean
+     * wherever the frame opens on sky. Over the paper page it is the paper.
+     *
+     * The strip the bars occupy is short, so the decision is taken on the top of the
+     * window rather than on the whole of it: that is where the status bar sits, it is the
+     * one bar iOS never collapses, and the mobile plate pans only a few per cent of its
+     * frame, so that band stays the same colour for the whole chapter.
+     */
+    function renderChromeSurface(scrollY: number) {
+      const top = scrollY;
+      const bottom = scrollY + Math.min(CHROME_STRIP, window.innerHeight);
+      const overlaps = (band: Band) => band.top < bottom && band.bottom > top;
+      // The two bars take one colour between them, so they can only disagree where a
+      // seam crosses the window. The page has one such seam that matters — the last
+      // chapter into the paper footer — and there the reader has arrived at the footer,
+      // which fills most of the window and sits under the bottom bar. Paper wins that
+      // one; the ALPINE frame above it is a pale sky, so the status bar barely parts
+      // from it. Everywhere else the top of the window decides.
+      const footerTop = scrollY + window.innerHeight - CHROME_STRIP;
+      const footerBottom = scrollY + window.innerHeight;
+      const bottomOnPaper = footerBands.some(
+        (band) => band.top < footerBottom && band.bottom > footerTop,
+      );
+      let active: HTMLElement | null = null;
+      if (!bottomOnPaper) {
+        // Chapters overlap at their seams and the earlier one holds the higher
+        // `z-index`, so the first match is the one actually painting at the window top.
+        for (const [index, band] of mediaBands.entries()) {
+          if (!overlaps(band)) continue;
+          active = chapterSections[index] ?? null;
+          break;
+        }
+      }
+
+      const tint = active
+        ? getComputedStyle(active).getPropertyValue("--chapter-chrome").trim() ||
+          paperTint
+        : paperTint;
+
+      if (chromeTint && chromeTint.dataset.tint !== tint) {
+        chromeTint.dataset.tint = tint;
+        chromeTint.style.setProperty("--chrome-tint", tint);
+      }
+      // Chrome, Edge and iOS before 26 still honour the meta, so it is kept in step.
+      if (themeColor && themeColor.content !== tint) themeColor.content = tint;
+    }
+
     function render() {
       const scrollY = window.scrollY;
       renderControlSurface(scrollY);
+      renderChromeSurface(scrollY);
 
       if (reducedMotion.matches) {
         reset();
