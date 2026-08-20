@@ -213,9 +213,13 @@ export function PageMotion() {
 
     const isCompact = () => window.innerWidth < COMPACT_WIDTH;
     const pick = (pair: readonly [number, number]) => (isCompact() ? pair[1] : pair[0]);
-    /** Both artboards are zoomed, so artboard px are scaled on the way out. */
+    /**
+     * Both artboards are zoomed, so artboard px are scaled on the way out. The divisor
+     * is the same `clientWidth` the head script in `src/app/layout.tsx` divides by, so
+     * the offsets written here cannot drift from the scale the canvas is drawn at.
+     */
     const scaleOf = () => {
-      const width = window.innerWidth;
+      const width = document.documentElement.clientWidth || window.innerWidth;
       if (width < COMPACT_WIDTH) return width / MOBILE_ARTBOARD_WIDTH;
       return width >= ARTBOARD_WIDTH ? width / ARTBOARD_WIDTH : 1;
     };

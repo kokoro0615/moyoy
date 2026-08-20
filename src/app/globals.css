@@ -1,6 +1,25 @@
 @import "tailwindcss";
 
+/* `atan2()` is the only way CSS can divide one length by another, and it is the one
+   place this page depends on a function whose implementations still disagree. WebKit
+   resolves `atan2(<length>, <length>)` differently when the two arguments carry
+   different units and answers 0 for `atan2(100vw, 375px)` (w3c/csswg-drafts#7482), so
+   `zoom: tan(atan2(...))` is invalid at computed-value time in Safari and the artboard
+   falls back to its authored width — a 375 px canvas centred in a 390 px phone, with a
+   paper gutter down both edges for the whole page. Registering the viewport width as a
+   `<length>` computes it to absolute pixels before `atan2()` sees it, so both arguments
+   arrive in the same unit. The inline scale script in `src/app/layout.tsx` still writes
+   both ratios as exact numbers before the first paint; this is the no-script path. */
+@property --canvas-viewport-width {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
 :root {
+  --canvas-viewport-width: 100vw;
+  --pc-canvas-scale: tan(atan2(var(--canvas-viewport-width), 1200px));
+  --sp-canvas-scale: tan(atan2(var(--canvas-viewport-width), 375px));
   --paper: #ece7d8;
   --ink: #11120f;
   --olive-aa: #68702f;
@@ -157,9 +176,9 @@ img {
 @media (width >= 1200px) {
   [data-app-shell] {
     /* Resolve the authored 1200 px canvas against the CSS viewport before React
-       hydrates. tan(atan2()) converts the two lengths into a dimensionless ratio in
-       Chromium, Firefox and WebKit without a JavaScript-owned layout fallback. */
-    --desktop-scale: tan(atan2(100vw, 1200px));
+       hydrates. The ratio itself is declared once on `:root`, where the head script can
+       replace it with an exact number for engines whose `atan2()` disagrees. */
+    --desktop-scale: var(--pc-canvas-scale);
   }
 
   /* `zoom` rather than `transform: scale()`. Both resolve the 1200 px canvas against the
@@ -508,6 +527,15 @@ main[data-page="moyoy-lp"] {
   display: block;
   inset: 0;
   width: 100%;
+  /* The mask alone does not hold the plate inside this window in WebKit: once the
+     window scrolls out of view, Safari keeps compositing the viewport-fixed layer below
+     and stops applying the ancestor mask to it, so the chapter photograph paints across
+     the hero and the chapter tone bleeds into the strips iOS Safari draws its toolbars
+     over. `clip-path` is an ordinary geometric clip that WebKit does apply to the
+     composited layer, and — unlike `transform`, `filter` or `contain: paint` — it does
+     not become the containing block for a fixed descendant, so the pin below stays
+     viewport-fixed. Verified in WebKit and Chromium at 390 and 1440. */
+  clip-path: inset(0);
   -webkit-mask-position: center top;
   mask-position: center top;
   -webkit-mask-repeat: no-repeat;
@@ -1296,7 +1324,7 @@ footer[data-fidelity="footer"] {
     /* Source→canvas ratio of the 751 px chapter strips (a 2× render of the 375.5 px
        canvas). A constant of the artwork, not of the window. */
     --sp-source-scale: calc(375 / 751);
-    --mobile-scale: tan(atan2(100vw, 375px));
+    --mobile-scale: var(--sp-canvas-scale);
     --first-view-height: calc(100dvh / var(--mobile-scale));
   }
 

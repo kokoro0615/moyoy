@@ -12,6 +12,12 @@ export const adobeFontsKitId = "yhj3ndj";
 
 export const adobeFontsKitStylesheet = `https://use.typekit.net/${adobeFontsKitId}.css`;
 
+/**
+ * The approved paper ground, mirrored from `--paper` in `src/app/globals.css`. It is
+ * declared here as well because the browser UI tint is set from metadata, not from CSS.
+ */
+export const paperTint = "#ece7d8";
+
 export const implementationContract = Object.freeze({
   approvedAssetsConfigured: false,
   approvedCopyConfigured: true,

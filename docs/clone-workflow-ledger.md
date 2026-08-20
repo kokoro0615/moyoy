@@ -226,3 +226,50 @@ control's own height.
 | Motion amplitude and drawer timing | owner confirmation still pending |
 | Chapter type (title, prose) has no relative offset | the chapters hold the photograph, its pan and one drawing; adding a third plane to the type is available but was not done, because the report was about background lines |
 | Instagram mark, SP product copy residuals | unchanged |
+
+## 2026-08-20 third session — Safari and iOS device defects
+
+- **Mode:** unchanged (authorized client rebuild; existing-product defect fix).
+- **Production owner:** unchanged — the main conversation.
+- **In scope:** two owner-reported defects observed on a physical iPhone against the
+  Vercel deployment — a blank margin at both edges of every viewport for the whole
+  document (VF-39) and dark green bands above the status bar and below the browser
+  toolbar (VF-40).
+- **Out of scope, unchanged:** approved copy, information architecture, routes, the NEWS
+  deferral, the footer policy links, the Instagram mark, the tablet band's bespoke
+  reflow, and the contour line-weight deviation recorded in the first session.
+
+### Reference and rights
+
+No new target site was visited and no asset was downloaded. No production asset changed:
+the corrections are CSS, one render-blocking head script, one metadata field and the
+divisor the scroll controller already used. The deployed HTML and stylesheet were fetched
+from the live origin to confirm the shipped build carried the construct under suspicion.
+
+### Comparison performed
+
+Both defects were reproduced from the repository's own build, not inferred. Rendering was
+compared across **Chromium 151, Firefox 153 and WebKit 26.5** at 360 / 375 / 390 / 402 /
+430 / 639 / 720 / 768 / 1200 / 1440 / 2560 px; the owner's device frame was measured
+against the Chromium 390 × 844 reference on three independent readings; the chapter plate
+was isolated with an eight-treatment matrix in WebKit and the pin re-measured at three
+scroll positions in both engines. The `1440x900`, `768x1024` and `390x844` matrix required
+by the workflow was exercised through `pnpm test:e2e` on all three engines and
+`pnpm test:visual` on Chromium.
+
+### Root causes
+
+| Defect | Root cause |
+| --- | --- |
+| VF-39 blank margin at both edges | `zoom: tan(atan2(100vw, <canvas>px))` — `atan2()` over two lengths in different units is unspecified (w3c/csswg-drafts#7482) and shipping WebKit does not return the ratio, so `zoom` was invalid in Safari and both artboards rendered at their authored width, centred by `margin-inline: auto` |
+| VF-40 green bands top and bottom | WebKit stops applying an ancestor `mask` to a `position: fixed` descendant once the masked window scrolls out of view, so the chapter plate's `--chapter-tone` painted outside its window — and with `viewport-fit=cover` that includes the strips iOS Safari draws its toolbars over |
+| Why neither was caught | every Playwright project is a desktop context at 1440 × 900, visual baselines are Chromium-only, and the mobile-width specs skip non-Chromium engines |
+
+### Still unresolved after this session
+
+| Item | State |
+| --- | --- |
+| VF-39 / VF-40 on the owner's device | corrected and verified in WebKit under Playwright, which is not iOS Safari; **a device re-check is required to close them** |
+| WebKit / mobile-context visual baselines | still absent; the two new checks are targeted invariants, not a Safari fidelity baseline |
+| `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
+| Contour line weight, motion amplitude, drawer timing, Instagram mark, SP product copy residuals | unchanged |

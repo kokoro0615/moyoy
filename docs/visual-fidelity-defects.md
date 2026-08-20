@@ -52,6 +52,8 @@ asset existence, build success, or implementation-authored regression snapshots.
 | VF-37 | PC/SP product line work | Owner review: the SVG of the three PERFUME/DIFFUSER product drawings is too faint | measuring integrated ink width (the antialiasing-independent statistic) against the approved 1200 px frame shows the drawings were **already faithful** — reference outline 0.251 px, production 0.243 px — and that the page around them was not. The **contour system is 4× the reference**: reference contour ink 0.250/0.258 px against production 0.891/1.145 px, because VF-28 promoted a 0.25 px background hairline to a 1 px stroke on percentile evidence that was contaminated by other ink in those bands. That inverted the master's line hierarchy — background whisper at statement weight — which is what makes the products read as washed out. The owner-approved contour weight is left untouched and the product line work is raised to the same crisp `1px` + `vector-effect: non-scaling-stroke`, so the two families match as they do in the master. Measured after: outline 0.243 → **0.977 px**. The signature accent path also shipped with no presentation attribute at all, rendering as a bare fill at 1.003 px against the reference's 1.255 px solid black; it now carries an explicit fill and hairline stroke at 1.578 px so it still outranks the outline | CORRECTED — MEASURED; the 4× contour deviation from the master is recorded here and is NOT resolved, see below |
 | VF-35b | fixed menu control, every width | **Owner rejection of VF-35.** The paper plate looks bad and reads as broken; keep the background transparent and change the control's own colour instead | the plate is removed and nothing is painted behind the mark at any scroll position. A single colour is still measurably impossible — sampling the surface behind the control at 1440 × 900 across all four chapters gives relative luminance 0.799 (paper) → 0.007 (ROOT forest) → 0.652 (ALPINE snow), and it crosses the ink/paper break *inside* one chapter (DUSK spans 0.008 to 0.379), so a per-chapter colour fails too. The control therefore adopts the treatment the page already uses for its own type over these same photographs and which the owner has already approved on all four chapter titles: page ink with no shadow over paper — byte-identical to the approved page-top frame — and the paper colour with the chapter halo over a photograph. Measured mark-vs-surround contrast after: page top 10.0 : 1, ROOT 11.7 : 1, DUSK 6.1 : 1, ALPINE 4.4 : 1, SP ROOT 16.1 : 1, SP ALPINE 4.5 : 1. The media band also became exact: the ROOT chapter box begins about 260 px above the photograph the reader sees, because the beige upper foreground is painted over it, so that band is now subtracted and the control stays ink there | CORRECTED — MEASURED ON ALL FOUR CHAPTERS AT 1440 AND 390; PENDING HUMAN REVIEW |
 | VF-38 | parallax coverage across the whole line system | Owner review: is the parallax actually applied to every background line, and does each object really offset from its neighbours? | audited by reading the rendered transform of every decorative element at nine scroll positions. Two real gaps. **(a) Three elements never moved at all:** the brand header rule, the brand footer rule — the two longest lines on the page — and the ROOT upper foreground. The two brand rules now drift with the rest of the line system, each anchored so the frame the reference approves is the frame that holds still (the header starts at its authored offset because the approved composition is the page top; the footer arrives at its authored offset because the approved composition is the page end). The ROOT foreground stays fixed and is the one documented exception: it is the seam between the paper page and the first photograph, its position is the measured VF-11 value, and it is also the signal VF-35b uses to know which surface is behind the control. **(b) Two of the four hero contour lines were moving invisibly.** Measuring each layer's own geometry shows hero layers 3 and 4 are vertically oriented (bounding boxes 388 × 801 and 435 × 709), and a vertical translation of a vertical line only slides the line along itself. Those two layers, and the product stack's small closed form, now carry a horizontal component perpendicular to their own direction, so the displacement is visible rather than merely present. Re-audited after: every element except the ROOT foreground changes on every band it crosses | CORRECTED — 9-POSITION AUDIT AT 1440 × 900; PENDING HUMAN REVIEW |
+| VF-39 | every viewport, Safari / iOS Safari only | Owner review on a physical iPhone (390 × 844): the page keeps a blank margin at both edges all the way to the end of the document and the composition is broken | both artboards resolve their authored canvas against the window with `zoom`, and the ratio was computed in CSS as `tan(atan2(100vw, 375px))` / `tan(atan2(100vw, 1200px))` — the only construct on the page whose implementations still disagree. `atan2()` over two lengths in **different units** is unspecified (w3c/csswg-drafts#7482) and shipping WebKit does not return the ratio, so `zoom` is invalid at computed-value time and falls back to `1`. The artboard then renders at its authored **375 px** (SP) / **1200 px** (PC) width and the base rule's `margin-inline: auto` centres it: a 7.5 px paper gutter down both edges of a 390 px phone, 27.5 px on a 430 px phone, 120 px on a 1440 px Safari window — and the whole composition 4 %–20 % off the frame it was measured against. The same ratio feeds `--first-view-height` and the scroll controller, so the scroll cue and every parallax offset were wrong with it. Measured on the owner's frame: the wordmark ink ends at 0.691 of the window against the approved 0.7067, i.e. exactly the 375/390 ratio. The ratio is now written as a plain number by a render-blocking head script before the first paint, and the CSS path registers the viewport width as a `<length>` so both `atan2()` arguments arrive in the same unit. Verified in Chromium, Firefox and WebKit at 360/375/390/402/430/639/720/768/1200/1440/2560: artboard left edge 0, artboard width = window width | CORRECTED — 11 WIDTHS × 3 ENGINES; PENDING HUMAN REVIEW ON DEVICE |
+| VF-40 | page top and page end, Safari / iOS Safari only | Owner review on a physical iPhone: a dark green band above the status bar and below the browser toolbar | DA-MEDIA-01 pins each chapter photograph with a real `position: fixed` plate inside a masked silhouette window, and the plate is backed by `--chapter-tone`. WebKit stops applying the ancestor mask to that composited layer once the window scrolls out of view: reproduced in WebKit at 390 × 844 and 1440 × 900, where the ROOT photograph paints across the paper hero — the hero clip reads mean rgb(20, 46, 32) against Chromium's rgb(231, 226, 211). ROOT holds the highest chapter `z-index`, and its tone `#12281d` is the green the owner photographed. With `viewport-fit=cover` the fixed plate also extends into the strips iOS Safari draws its toolbars over, which is where the escape stays visible on the device. The window now carries an explicit `clip-path: inset(0)` — a geometric clip WebKit does apply to the composited layer, and, unlike `transform`, `filter` or `contain: paint`, one that does not become the containing block for a fixed descendant, so the plate stays viewport-fixed (pin rect measured at 0/844 at three scroll positions in both engines, unchanged). The browser UI tint is additionally stated as `theme-color: #ece7d8` instead of being sampled from the page. Measured after: WebKit hero clip rgb(231, 226, 211) at 390, rgb(235, 230, 215) at 1440 — identical to Chromium | CORRECTED — MEASURED IN WEBKIT AND CHROMIUM AT 390 AND 1440; PENDING HUMAN REVIEW ON DEVICE |
 
 ## Closure evidence
 
@@ -265,3 +267,65 @@ re-recorded from the current build, and the suite passes twice from a clean run.
 | `pnpm test:visual` | PASS — 21 baselines, all re-recorded with `--update-snapshots=all` |
 | `pnpm test:lhci` | PASS — performance 100, accessibility 100, LCP 0.7 s, CLS 0, TBT 0 ms |
 | `pnpm test:fidelity`, `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
+
+## 2026-08-20 third owner-review pass — Safari and iOS evidence status
+
+### What the two reports had in common
+
+Both defects were engine-specific and both were invisible to the gate that was running.
+Every Playwright project in `playwright.config.ts` is a **desktop context at 1440 × 900**,
+and `pnpm test:visual` records baselines on **Chromium only**; the specs that do resize to
+390 × 844 mostly carry `test.skip(browserName !== "chromium")`. Nothing in the suite ever
+compared a WebKit frame to anything. The two defects reproduce in WebKit at the first
+attempt, so the gap was coverage, not difficulty.
+
+### VF-39 — measurement
+
+| Reading | Approved / Chromium | Owner's iPhone frame | Unscaled 375 canvas on a 390 window |
+| --- | --- | --- | --- |
+| Wordmark ink right edge, as a fraction of the window | 0.7067 | ≈0.691 | 0.6987 |
+| Wordmark ink width, as a fraction of the window | 0.250 | ≈0.240 | 0.240 |
+| `.brand-header` top, in CSS px below the content top | 334.8 | ≈325 | 321.9 |
+
+The screenshot's 919 : 1987 aspect matches 390 × 844 exactly, so the device is a 390 pt
+phone and the readings are the 1 / 1.04 signature of an unscaled canvas.
+
+### VF-39 — after
+
+`zoom` resolved from the head script, measured as `getComputedStyle(...).zoom` and as the
+artboard's own rect, in Chromium 151 / Firefox 153 / WebKit 26.5:
+
+| Window | 360 | 375 | 390 | 402 | 430 | 639 | 720 | 768 | 1200 | 1440 | 2560 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Artboard left | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Artboard width = window | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+### VF-40 — isolation
+
+Eight candidate treatments were rendered in WebKit at 390 × 844 and the paper hero clip
+was measured for each. Only two removed the bleed: `clip-path: inset(0)` and
+`transform: translateZ(0)`. The transform was rejected on inspection — it becomes the
+containing block for the fixed plate and would silently unpin DA-MEDIA-01. `isolation`,
+`will-change: mask`, `opacity: 0.999`, a self-mask on the plate, `backface-visibility` and
+removing `overflow: clip` all left the bleed in place. The pin was then re-measured at
+three scroll positions in both engines with and without the clip: identical, `0 / 844`.
+
+### Gate status
+
+| Gate | Result |
+| --- | --- |
+| `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | PASS |
+| `pnpm test:unit` | PASS — 37 node tests, 3 vitest tests |
+| `pnpm test:e2e` (Chromium 151 / Firefox 153 / WebKit 26.5) | PASS — 108 passed, 18 skipped by design; includes 13 new cross-engine invariants |
+| `pnpm test:visual` | PASS — 21 baselines unchanged, so the correction costs no Chromium fidelity |
+| `pnpm test:a11y` | PASS |
+| `pnpm test:fidelity`, `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
+
+### Still open
+
+- No WebKit or mobile-context **visual baseline** exists. The two new invariants
+  (`resolves the artboard against the full Npx window`, `holds every chapter plate inside
+  its window`) are targeted at the two failure modes that were found, not at Safari
+  fidelity in general.
+- Both corrections are verified in WebKit 26.5 under Playwright, which is **not** iOS
+  Safari. Only a re-check on the owner's device closes VF-39 and VF-40.
