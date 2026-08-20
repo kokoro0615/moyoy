@@ -1,23 +1,21 @@
 /**
- * Device diagnostic for the iOS 26 browser-bar bands, round two. Not part of the landing
+ * Device diagnostic for the iOS 26 browser-bar bands, round three. Not part of the landing
  * page: it is served at `/edge-probe` so the defect can be measured on the phone that
  * shows it, with no Mac and no Web Inspector attached.
  *
- * Round one settled three things on the device, and they are why this page exists in its
- * present shape: `lvh` equals `innerHeight`, so no viewport unit can size a box past the
- * window; a fixed box is clipped to the window even when it declares a 160 px overhang;
- * and the strips the browser bars occupy carry the page's ground colour at unchanged hue
- * and lightness with roughly 19 points of saturation removed — a translucent material
- * over something, not an opaque fill.
+ * Rounds one and two settled the mechanism on the device. `lvh` equals `innerHeight`, so
+ * no viewport unit reaches past the window. A fixed box declaring a 160 px overhang paints
+ * no further than one declaring none — it is clipped to the window. And the strips the
+ * browser bars occupy are translucent over the DOCUMENT's own scrolled paint: a striped
+ * absolutely positioned band read back through the top bar at hue 173–176° against its own
+ * 186°, while the viewport-fixed plate never appeared in a strip at all — where that band
+ * stopped short of the window edge the bar fell back to paper at 45°, not to the plate's
+ * green at 147°.
  *
- * What that something is decides every candidate fix, and this page separates the four
- * possibilities by colour: the document band is teal, the fixed plate is green, the
- * document ground is the landing page's own paper, and the striped variants tell real
- * paint apart from a derived flat colour.
- *
- * A route handler rather than a page, so nothing about the measurement belongs to the
- * framework: no hydration, no bundler CSS, no React. It declares no `theme-color`, so
- * whatever the bars do here is the browser's own heuristic.
+ * So the photograph cannot reach those strips from the fixed plate, and something that is
+ * document content has to carry it. This round asks which candidate can, and colours the
+ * answer: every candidate paints cyan stripes, the flat fill that produces the band today
+ * is magenta, and the fixed plate covering the window is green.
  *
  * Remove this route once the defect is closed.
  */
@@ -26,50 +24,65 @@ export const dynamic = "force-static";
 const probeDocument = String.raw`
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>MOYOY edge probe 2</title>
+<title>MOYOY edge probe 3</title>
 <style>
-  /* Round two. Round one established, on the device, that:
-       - lvh === innerHeight === 754, so no viewport unit can size a box past the window;
-       - a fixed box is clipped to the window even when it declares a 160px overhang;
-       - the strips the browser bars occupy show the page's ground colour, desaturated by
-         about 19 points of saturation at unchanged hue and lightness - a translucent
-         material over something, not an opaque fill.
-     What is unresolved is WHAT that something is: document content that scrolls, or one
-     flat colour the browser derived from the page. Every candidate fix depends on which. */
+  /* Round two settled the mechanism: the bars are translucent over the DOCUMENT's own
+     scrolled paint, and a viewport-fixed box is clipped to the window and never reaches
+     them. So the photograph cannot get into those strips from the fixed plate. Something
+     that is document content has to carry it.
+
+     This round asks which candidate can. Every candidate paints CYAN STRIPES; the flat
+     fill that currently produces the band is MAGENTA; the viewport-fixed plate that
+     covers the window is GREEN. Cyan in a bar means that candidate reaches it. */
 
   * { box-sizing: border-box; }
-
-  /* PAPER - the landing page's real document ground, so the fallback here is its fallback. */
   html, body { margin: 0; background: #ece7d8; }
-  body { height: 340vh; }
+  body { height: 360vh; }
 
-  /* TEAL - the analogue of '.chapter-photo': an ordinary absolutely positioned box, part
-     of the document, spanning one band of it exactly as a chapter does. If a bar shows
-     teal, this box is what the bar is over. If it shows teal STRIPES, the bar is over
-     real scrolled paint and a photograph could be put there; if it shows FLAT teal in the
-     striped variants, the browser is not showing paint at all - it derived a colour. */
+  /* The document band - the analogue of '.chapter-photo', flat-filled as the landing page
+     fills it today. */
   #tone {
     position: absolute;
-    top: 90vh;
+    top: 80vh;
     right: 0;
     left: 0;
-    height: 160vh;
+    height: 200vh;
+    background-color: #c2185b;
   }
-  body[data-tone="flat"] #tone { background-color: #0e8f9e; }
-  body[data-tone="scroll"] #tone {
-    background-image: repeating-linear-gradient(
-      135deg, #0e8f9e 0 20px, #063f47 20px 40px, #16c0d4 40px 46px
-    );
-  }
-  body[data-tone="fixed"] #tone {
+
+  /* Candidate 2 - one declaration on the band itself: a background whose positioning area
+     is the viewport rather than the element, which is how the fixed plate is framed. */
+  body[data-try="bgfix"] #tone {
     background-attachment: fixed;
     background-image: repeating-linear-gradient(
       135deg, #0e8f9e 0 20px, #063f47 20px 40px, #16c0d4 40px 46px
     );
   }
-  body[data-tone="none"] #tone { background: none; }
 
-  /* GREEN - the analogue of '.chapter-photo-pin': the viewport-fixed plate. */
+  #bleed {
+    display: none;
+    background-image: repeating-linear-gradient(
+      135deg, #0e8f9e 0 20px, #063f47 20px 40px, #16c0d4 40px 46px
+    );
+  }
+  /* Candidate 3 - an ordinary absolutely positioned box, pinned from the scroll loop. */
+  body[data-try="jsabs"] #bleed {
+    display: block;
+    position: absolute;
+    top: var(--js-top, 0);
+    right: 0;
+    left: 0;
+    height: var(--js-height, 0);
+  }
+  /* Candidate 4 - sticky, which the browser pins itself but only within its own band. */
+  body[data-try="sticky"] #bleed {
+    display: block;
+    position: sticky;
+    top: calc(-1 * var(--bleed, 80px));
+    height: calc(100lvh + 2 * var(--bleed, 80px));
+  }
+
+  /* Always present: the viewport-fixed plate the landing page ships. */
   #plate {
     position: fixed;
     z-index: 1;
@@ -100,7 +113,6 @@ const probeDocument = String.raw`
   }
   .chrome-shield[data-edge="top"] { top: -100px; }
   .chrome-shield[data-edge="bottom"] { bottom: -100px; }
-  body[data-shield="off"] .chrome-shield { display: none; }
 
   #readout {
     position: fixed;
@@ -121,7 +133,7 @@ const probeDocument = String.raw`
   .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .row button {
     flex: 1 1 auto;
-    padding: 9px 4px;
+    padding: 10px 4px;
     border: 1px solid #55655d;
     border-radius: 7px;
     color: #f4f1ea;
@@ -133,7 +145,7 @@ const probeDocument = String.raw`
   #legend { margin-top: 8px; color: #9fb4ab; font-size: 11.5px; line-height: 1.45; }
 </style>
 
-<div id="tone"></div>
+<div id="tone"><div id="bleed"></div></div>
 <div id="plate">
   <div class="ruler" data-at="top"></div>
   <div class="ruler" data-at="bottom"></div>
@@ -142,23 +154,21 @@ const probeDocument = String.raw`
 <div aria-hidden="true" class="chrome-shield" data-edge="bottom"></div>
 
 <div id="readout">
-  <h1>edge probe 2</h1>
+  <h1>edge probe 3</h1>
   <div id="out">…</div>
   <div class="row">
-    <button data-set="tone" data-value="flat" type="button">1 flat</button>
-    <button data-set="tone" data-value="scroll" type="button">2 stripes</button>
-    <button data-set="tone" data-value="fixed" type="button">3 str-fixed</button>
-    <button data-set="tone" data-value="none" type="button">4 none</button>
+    <button data-set="try" data-value="none" type="button">1 none</button>
+    <button data-set="try" data-value="bgfix" type="button">2 bg-fixed</button>
+    <button data-set="try" data-value="jsabs" type="button">3 js-abs</button>
+    <button data-set="try" data-value="sticky" type="button">4 sticky</button>
   </div>
   <div class="row">
     <button data-set="plate" data-value="on" type="button">plate ON</button>
     <button data-set="plate" data-value="off" type="button">plate OFF</button>
-    <button data-set="shield" data-value="on" type="button">shield ON</button>
-    <button data-set="shield" data-value="off" type="button">shield OFF</button>
   </div>
   <div id="legend">
-    bar shows TEAL STRIPES = document paint reaches it · FLAT TEAL = derived colour ·
-    CREAM = html/body only · GREEN = the fixed plate reaches it
+    CYAN STRIPES in a bar = that candidate reaches it · MAGENTA = it does not ·
+    CREAM = outside the band. Scroll a little and check the cyan holds still.
   </div>
 </div>
 
@@ -167,14 +177,15 @@ const probeDocument = String.raw`
   const out = document.getElementById("out");
   const plate = document.getElementById("plate");
   const tone = document.getElementById("tone");
+  const bleed = document.getElementById("bleed");
+  const BLEED = 80;
 
   const params = new URLSearchParams(location.search);
-  body.dataset.tone = params.get("tone") || "scroll";
+  body.dataset.try = params.get("try") || "bgfix";
   body.dataset.plate = params.get("plate") || "on";
-  body.dataset.shield = params.get("shield") || "on";
 
   const units = {};
-  for (const unit of ["vh", "svh", "lvh", "dvh"]) {
+  for (const unit of ["lvh", "svh"]) {
     const box = document.createElement("div");
     box.style.cssText =
       "position:absolute;top:0;left:0;width:1px;visibility:hidden;pointer-events:none;height:100" +
@@ -205,38 +216,37 @@ const probeDocument = String.raw`
 
   const px = (v) => Math.round(v * 10) / 10;
 
+  function pin() {
+    if (body.dataset.try !== "jsabs") return;
+    const toneTop = tone.getBoundingClientRect().top + scrollY;
+    body.style.setProperty("--js-top", Math.round(scrollY - toneTop - BLEED) + "px");
+    body.style.setProperty("--js-height", innerHeight + BLEED * 2 + "px");
+  }
+
   function render() {
-    const toneRect = tone.getBoundingClientRect();
-    const inBand = toneRect.top < innerHeight && toneRect.bottom > 0;
+    pin();
+    const on = body.dataset.try !== "none" && body.dataset.try !== "bgfix";
+    const rect = on ? bleed.getBoundingClientRect() : null;
     out.innerHTML = [
-      "tone <b>" +
-        body.dataset.tone +
-        "</b>  plate <b>" +
-        body.dataset.plate +
-        "</b>  shield <b>" +
-        body.dataset.shield +
-        "</b>",
-      '<span class="k">window   </span>' + innerWidth + " x " + innerHeight,
-      '<span class="k">lvh/svh  </span>' +
+      "try <b>" + body.dataset.try + "</b>   plate <b>" + body.dataset.plate + "</b>",
+      '<span class="k">window  </span>' + innerWidth + " x " + innerHeight,
+      '<span class="k">lvh/svh </span>' +
         px(units.lvh.getBoundingClientRect().height) +
         " / " +
         px(units.svh.getBoundingClientRect().height),
-      '<span class="k">plate    </span>' +
-        (body.dataset.plate === "off"
-          ? "(off)"
-          : "top " + px(plate.getBoundingClientRect().top) +
-            "  bottom " + px(plate.getBoundingClientRect().bottom)),
-      '<span class="k">tone band</span>' +
-        'top ' +
-        px(toneRect.top) +
-        "  bottom " +
-        px(toneRect.bottom) +
-        (inBand ? "  <b>ON SCREEN</b>" : "  off screen"),
-      '<span class="k">hit t/b  </span>' +
+      '<span class="k">candidate </span>' +
+        (rect
+          ? "top " + px(rect.top) + "  bottom " + px(rect.bottom)
+          : body.dataset.try === "bgfix"
+            ? "(a background, no box)"
+            : "(none)"),
+      '<span class="k">overhang  </span>' +
+        (rect ? "top " + px(-rect.top) + "  bottom " + px(rect.bottom - innerHeight) : "-"),
+      '<span class="k">hit t/b </span>' +
         describe(hitAt(innerWidth / 2, 4)) +
         " / " +
         describe(hitAt(innerWidth / 2, innerHeight - 4)),
-      '<span class="k">scrollY  </span>' + Math.round(scrollY),
+      '<span class="k">scrollY </span>' + Math.round(scrollY),
     ].join("<br>");
 
     for (const button of document.querySelectorAll(".row button")) {
@@ -257,12 +267,10 @@ const probeDocument = String.raw`
   addEventListener("scroll", render, { passive: true });
   addEventListener("resize", render, { passive: true });
   render();
-  setInterval(render, 400);
+  setInterval(render, 300);
 
-  // Park the view inside the tone band on load, so the first screenshot is the case
-  // that matters without anyone having to hunt for it.
   addEventListener("load", () => {
-    if (!scrollY) scrollTo(0, Math.round(innerHeight * 1.4));
+    if (!scrollY) scrollTo(0, Math.round(innerHeight * 1.6));
   });
 </script>
 `;
