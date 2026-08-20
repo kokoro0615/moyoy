@@ -1,12 +1,18 @@
 # iOS 26 Safari browser-bar tint — root cause, from WebKit source
 
-Investigation of the symptom reported against `ceb7ae5` (deployed to Vercel production
-2026-08-20T10:42:31Z, deployment state `success`): the status bar / toolbar band does not
-track the page and does not clear.
+Investigation of the symptom reported against `ceb7ae5`: an unwanted band of colour above
+and below the page in iOS 26 Safari.
+
+**The goal changed once the mechanism was understood.** Three commits, and the first half of
+this investigation, went into making that band the *right* colour. What the page actually
+wants is no band at all: DA-MEDIA-01 runs photography to both window edges, and any fill is
+a stripe across it. Safari 26 has a mode for that — it simply requires that nothing on the
+page qualify as an edge candidate. §7 is the change that reaches it; §1–§6 are the mechanism,
+and they hold either way.
 
 All claims below are read out of the shipping WebKit tree
 (`https://github.com/WebKit/WebKit`, `main`), not out of community blog posts. The two
-secondary sources the previous session relied on are both wrong on the point that mattered.
+secondary sources the earlier work relied on are both wrong on the point that mattered.
 
 ---
 
@@ -168,12 +174,13 @@ Three caveats:
   our JS rewrites the anchor's colour. A design that expects the browser to re-derive on
   scroll by itself will not work.
 - The test exercises an `opacity`/`pointer-events` write, which changes the element's
-  *candidacy*. Our steady-state case is a `background-color`-only write on an
+  *candidacy*, whereas our steady-state case is a `background-color`-only write on an
   already-qualifying element. Source says that repaints the layer
-  (`RenderLayerBacking::setContentsNeedDisplay` → `setNeedsFixedContainerEdgesUpdateIfNeeded`),
-  but there is no layout test pinning it, and WebKit Bug 301108 records a related failure on
-  the **`<body>`** path. This is the one residual risk and it is what the device check must
-  settle. Contingency in §7.5.
+  (`RenderLayerBacking::setContentsNeedDisplay` → `setNeedsFixedContainerEdgesUpdateIfNeeded`)
+  and no layout test pins it, so this was carried as the one residual risk —
+  **settled on hardware**: with the opaque anchors deployed, both bars track the page across
+  scroll on an iPhone. WebKit Bug 301108, which records the same failure on the `<body>`
+  path, does not extend to a fixed candidate.
 - The `preferExistingColor` branch above bypasses re-derivation for viewport-sized /
   dimming / sidebar containers regardless of how often the flag is set. Anything that makes
   a viewport-sized element win the hit test freezes the tint.
@@ -234,118 +241,177 @@ source:
 
 | Hypothesis from the brief | Status |
 |---|---|
-| P1 — JS re-sampling never happens | **Refuted.** Re-sampling works; the anchor is what is not sampled. |
+| P1 — JS re-sampling never happens | **Refuted, then confirmed on hardware.** Re-sampling works; the anchor was what was not sampled. With the opaque anchors deployed, both bars track the page across scroll on an iPhone. |
 | P2 — not deployed / stale cache | **Cleared.** `ceb7ae5` → production `success` at 2026-08-20T10:42:31Z. |
 | P4 — geometry thresholds unmet | **Partly true.** Width/height/position are fine; the disqualifier is `opacity`. |
 | P4 — another fixed element wins | **Confirmed and load-bearing.** `.chapter-photo-pin` wins the retry pass and freezes the colour. |
 | P5 — canvas taint / CSP | **Cleared.** `readRamp()` catches and caches failure, degrading to `--chapter-tone`; assets are same-origin; `next.config.ts` ships no CSP. Neither can produce a frozen band. |
-| P3 — device settings ("ウェブサイトの色を表示" off, reduced transparency) | **Not testable from here.** Still worth confirming on the device before the next build. |
+| P3 — device settings ("ウェブサイトの色を表示" off, reduced transparency) | **Cleared.** The tint responds on the device, so the setting is on. |
 
-## 7. The change
+## 7. The change: refuse the fill
 
-Minimal, and it keeps the existing architecture:
+Safari 26 runs one of two modes over each window edge. The demo page for
+[`klmkyo/ios-safari-restore-meta-theme-color`](https://ios-safari-restore-meta-theme-color.pages.dev/)
+states it plainly:
 
-1. **Shipped: `opacity: 1` plus a mask fade.** `opacity` is the constraint that has already
-   broken twice, so it is stated explicitly rather than left to the initial value, and it is
-   the one option that does not depend on the exact value of a WebKit constant.
+> If it does not detect an element touching the top or bottom edge, browser UI tends to stay
+> transparent-ish. If it does detect an element close to the edge, Safari tries to sample its
+> color and tint the browser UI to match.
 
-   Opacity alone was not enough. Measured against the approved 390×844 frames, a flat band
-   sits 63–127 of mean per-pixel RGB distance from the photograph it covers: the *mean*
-   colour matches — which is why the tint assertion passes — but the photograph's local
-   variance (σ ≈ 40–80 per channel) does not survive, so the band reads as a flat strip
-   wherever the chrome fails to cover it. The fade fixes that without touching sampling,
-   because WebKit reads the box's declared `background-color` and neither
-   `isHiddenOrNearlyTransparent()` nor `containerEdgeCandidateResult()` looks at masking:
+Confirmed on an iPhone running iOS 26.6.1: with the demo's anchors disabled, both bars are
+translucent and the page runs under them. That is the mode this page wants.
 
-   ```css
-   .chrome-tint[data-edge="top"]    { mask-image: linear-gradient(to bottom, #000 0 4px, transparent); }
-   .chrome-tint[data-edge="bottom"] { mask-image: linear-gradient(to top,    #000 0 4px, transparent); }
-   ```
+### 7.1 What supplies the fill here
 
-   The first 4 px stay solid so that the documented sample point (`sampleRectMargin = 4`) is
-   covered by a fully opaque strip — nothing then rests on the assumption that masking does
-   not affect hit testing. Measured per row at 390×844, the delta now ramps from the edge to
-   nothing at the seam:
+Nothing on the page asks to tint the bars, but `.chapter-photo-pin` supplies a candidate
+anyway. It is `position: fixed; inset: 0` — exactly window-sized — so
+`containerEdgeCandidateResult()` returns `IsViewportSizedCandidate`. The silhouette does not
+help: a CSS mask does not affect hit testing, so the plate answers the edge hit test even
+where its mask is fully transparent. That is the original defect, and `src/app/layout.tsx`
+recorded it before anyone understood it:
 
-   | frame | before (mean) | after (mean) | after, row 0 → row 15 |
-   |---|---|---|---|
-   | ROOT top | 117.4 | 78.5 | 138 → 3 |
-   | DUSK top | 104.8 | 67.0 | 113 → 5 |
-   | ALPINE top | 98.5 | 62.4 | 103 → 4 |
-   | FOOTER top | 77.2 | 47.1 | 79 → 4 |
-   | DUSK bottom | 63.0 | 39.9 | 65 → 3 |
+> Without a declared tint iOS Safari picks its own from the rendered page, and on the
+> approved paper page it settled on the chapter tone behind the fixed plate: a dark green
+> band above the status bar and below the toolbar.
 
-   What is left is concentrated in the 4–5 rows deepest inside the status bar and the home
-   indicator; there is no longer an edge against the photograph.
+Being window-sized it also lands on `preferExistingColor` (§3), which is why the band then
+refused to change.
 
-2. Alternatives considered and not taken:
-   - `opacity: 0.15`. WebKit samples the declared colour, so the bar would still be right
-     while the band painted at 15 %. Rejected because it clears
-     `nearlyTransparentAlphaThreshold` by only 0.05 and would break silently if Apple raised
-     that constant.
-   - `filter: opacity(0)`. Would work today — the predicate reads `opacity`, not `filter` —
-     but it defeats a guard whose entire purpose is that the bar matches something the reader
-     can see, so it is the option most likely to be closed.
-3. Keep `pointer-events: none`, keep `z-index: 120`, keep `height: 16px`, keep the rAF
-   `--chrome-tint` writes. All verified correct against source.
-4. Rewrite the `.chrome-tint` comment block in `globals.css` and the `renderChromeSurface`
-   comment in `page-motion.tsx`: both currently state the false `opacity: 0` claim and the
-   wrong 80 % / 3 px thresholds.
-5. **Contingency, only if the device shows the tint correct at first paint but frozen on
-   scroll** — i.e. if a `background-color`-only write turns out not to invalidate. Do not
-   build this pre-emptively; it is more machinery than the evidence currently justifies.
-   Force the invalidation WebKit definitely honours (`WebPage.cpp`: adding/removing a
-   viewport-constrained object sets the flag) by replacing the node instead of restyling it:
-   give each anchor a React `key` derived from the quantised tint, so a colour change
-   unmounts the old fixed node and mounts a new one. Quantise hard (chapter-level, or ~8
-   steps) so this happens a handful of times per scroll, never per frame.
+### 7.2 `.chrome-shield` — take the hit, then fail
+
+`fixedContainerEdges()` hit-tests one point per edge and walks up the lineage **of the box it
+hit**. A box that fails the candidate test does not hand the edge back to the rest of the
+page — the walk continues to that box's own ancestors. So a small fixed box at the sample
+point, whose ancestors are not fixed, ends the walk with no candidate at all:
+
+```css
+.chrome-shield {
+  position: fixed;
+  z-index: 120;
+  left: calc(50% - 12px);
+  width: 24px;
+  height: 24px;
+  background-color: var(--paper);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(#0000, #0000);
+  mask-image: linear-gradient(#0000, #0000);
+}
+.chrome-shield[data-edge="top"]    { top: 0; }
+.chrome-shield[data-edge="bottom"] { bottom: 0; }
+```
+
+Every value is doing work:
+
+| property | why |
+|---|---|
+| `24px` square | `compareWithViewportSize()` returns `Smaller` below 90 % of the window on a side. `Smaller` on both axes is `TooSmall` — rejected. 24 px clears that by a wide margin even at the 320 px minimum width. |
+| `background-color` | **Load-bearing.** Without a background the box is `IsHiddenOrTransparent`, which *does* set `retryHonoringPointerEvents`; the retry honours `pointer-events: none`, steps over the shield, and finds the plate. `TooSmall` is one of the three results that set no retry flag. The colour itself is never read — `primaryBackgroundColorForRenderer()` returns nothing once the box is `Smaller` — so it is the paper only so that anything which ever defeats the mask shows the page's own ground. |
+| `left: calc(50% - 12px)` | The sample point is the midpoint of the edge, inset `sampleRectMargin = 4`. |
+| `z-index: 120` | The shield must be the box the hit test lands on, above the plate. |
+| `pointer-events: none` | It must not take taps. Safe: the first pass carries `IgnoreCSSPointerEventsProperty`, and `TooSmall` never triggers the second. |
+| transparent mask | Paints nothing. No gate in the sampler reads a mask — grep the whole of `fixedContainerEdges()` and the only properties it touches are `visibility`, `opacity`, background, `backdrop-filter`, `z-index`, `pointer-events` and the border box. |
+
+`clip-path` cannot be used for the hiding: `RenderLayer::hitTestLayer()` calls
+`hitTestClipPath()` explicitly, so a clipped-away box is not hit at all and the plate wins.
+
+### 7.3 What was removed
+
+The whole tint pipeline in `page-motion.tsx` — the ramp cache, `readRamp`/`loadRamp`,
+`rampColour`/`rampCoverage`, `parseHex`, `maskSourceOf`, `ChapterSurface`, the `PaperBand`
+alpha ramp, `STATUS_BAR`/`TOOL_BAR`, and `renderChromeSurface()` including its writes to
+`document.body.style.backgroundColor` and to the `theme-color` meta. 875 lines to 521. The
+`theme-color` meta stays declared in `layout.tsx` as a static paper tint, which is what
+Chrome and pre-26 iOS still read.
+
+The e2e check was inverted with it. It asserted that each anchor's colour matched the page;
+it now asserts that **nothing on the page qualifies as an edge candidate**, at both edges,
+across the same eight scroll offsets, by re-implementing the source predicate
+(`MARGIN = 4`, `MINIMUM_RATIO = 0.9`, lineage walk). It lifts `pointer-events` for the read
+because `elementFromPoint` has no equivalent of `IgnoreCSSPointerEventsProperty`.
+
+### 7.4 No sanctioned alternative exists
+
+- `<meta name="theme-color">` is still parsed and surfaced to embedders as
+  `WKWebView.themeColor`, but the public `ContentInsetBackgroundFill` path resolves fixed
+  edges → fixed colour → `underPageBackgroundColor` and never consults it. Apple's documented
+  control for home-screen apps remains `apple-mobile-web-app-status-bar-style`.
+- `sampledPageTopColor` / `PageColorSampler::sampleTop()` samples actually-rendered pixels,
+  disqualifies background images, canvas and iframes, and its `maxDifference` / `minHeight`
+  settings default to 0 (disabled). No page-level opt-in.
+- Nothing in the Safari 26.0–26.6 release notes, WWDC26 (which targets Safari 27), the WHATWG
+  HTML standard, or CSSWG drafts offers an author API.
+
+The whole mechanism is an unstandardised internal heuristic. Treat translucent bars as a
+progressive enhancement, never as an acceptance criterion.
+
+### 7.5 Failure mode
+
+If Apple changes the classification so the shield becomes a candidate, its declared
+`background-color` is the paper — so the bars fill with paper rather than with a chapter
+tone. That is the mildest available failure. If instead the shield stops taking the hit, the
+plate wins and the old chapter-tone band returns.
 
 ## 8. Verification
 
-Playwright's `webkit` cannot verify any of this. The sampling path is Cocoa-only
+Playwright cannot verify the bars. The sampling path is Cocoa-only
 (`WebPage::sidesRequiringFixedContainerEdges` is gated on
 `settings().contentInsetBackgroundFillEnabled()` and on `obscuredInsets` supplied by the
-Safari UI process) and the tint is painted by native chrome that never appears in a page
-screenshot. A Playwright check can only prove that our JS computes the colour it intended —
-which was already true in the broken build.
+Safari UI process) and the bars are painted by native chrome that never appears in a page
+screenshot.
 
-Valid verification is device-only:
+What it *can* verify is both halves of the predicate, deterministically:
+
+- **Nothing qualifies as an edge candidate** — the e2e check above, green on Chromium,
+  Firefox and WebKit at eight scroll offsets on both edges.
+- **The shields paint nothing** — all 21 visual baselines are the `ceb7ae5` frames, taken
+  when no shield existed. Pixel-identical to not being there.
+
+Device checks:
 
 1. Mac + cable, Safari → Develop → device → page, open Web Inspector.
-2. Console: confirm no exceptions (canvas taint, etc.).
-3. Evaluate on the device:
-   `[...document.querySelectorAll('.chrome-tint')].map(n => [n.dataset.edge, n.getBoundingClientRect(), getComputedStyle(n).opacity, getComputedStyle(n).backgroundColor])`
-   and confirm `opacity >= 0.1`, `height > 10`, `width >= 0.9 * innerWidth`, and that the
-   rect contains the midpoint of its edge inset by 4 px.
-4. `document.elementFromPoint(innerWidth / 2, 4)` should be the top anchor.
-5. Screenshot at several scroll positions on the device, first load and after scrolling, and
-   confirm the bars change with the page.
-6. Confirm on the device: Settings → Apps → Safari → Tabs → show website colours is on, and
-   Reduce Transparency is off.
+2. Console: no exceptions.
+3. `document.elementFromPoint(innerWidth / 2, 4)` after lifting `pointer-events` on
+   `.chrome-shield[data-edge="top"]` should return the shield.
+4. Both bars translucent, photography running under them, at first load and after scrolling
+   into each chapter. This is the only check that proves the outcome.
+5. The menu control must not sit under the Dynamic Island — that would mean
+   `env(safe-area-inset-top)` is returning 0 (WebKit 301994, see §9).
 
 ## 9. Known limitations no page-level fix can reach
 
-- Opening the modal `<dialog>` puts it in the top layer over the sample point on narrow
-  windows, and its `::backdrop` takes the `containerResultFromBackdrop` path, which sets
-  `isDimmingLayer` → `preferExistingColor` → the previous colour is reused. Tint changes
-  while the menu is open are therefore not reliable.
-- **iPad / macOS**: `topContentInsetBackgroundCanChangeAfterScrolling` is `false` there, so
-  the status bar / top inset colour is fixed at first paint after the first user scroll. No
-  page-level fix exists. Any acceptance criterion on top tint should be scoped to iPhone.
-- Open WebKit bugs, from the Codex pass (all still `NEW` at time of writing):
-  - [301108](https://bugs.webkit.org/show_bug.cgi?id=301108) — iOS 26, changing `body` CSS
-    variables for light/dark updates the in-page header but not the native chrome until
-    reload. Same shape as a custom-property-driven tint, on the `<body>` fallback path.
+- **Menu open on a narrow window.** The modal `<dialog>` is in the top layer, above the
+  shield. At 390 px it is 250 px wide and spans the full height, so it covers the sample
+  point and classifies as `IsSidebar` — a candidate — and the bars take its colour while the
+  menu is open. At 1440 px the drawer does not reach the midpoint and the shield still wins.
+  Its `::backdrop` takes the `containerResultFromBackdrop` path, which sets `isDimmingLayer`
+  and therefore `preferExistingColor`.
+- **Landscape.** `sidesRequiringFixedContainerEdges` adds `Left`/`Right` when those obscured
+  insets are non-zero. The shields sit at the top and bottom midpoints, so a side edge would
+  still be answered by the plate. Untested.
+- **iPad / macOS.** `topContentInsetBackgroundCanChangeAfterScrolling` is `false` there
+  (`PAL::currentUserInterfaceIdiomIsSmallScreen()` on iOS family, `false` elsewhere), so the
+  top inset colour is fixed at first paint after the first user scroll. Any acceptance
+  criterion on the top edge should be scoped to iPhone.
+- Open WebKit bugs, all still `NEW`:
+  - [301994](https://bugs.webkit.org/show_bug.cgi?id=301994) — `env(safe-area-inset-top)`
+    returns 0 and a status-bar strip reclaims space. Reported broken on 26.1, 26.5.2 and
+    iOS 27 beta; working on 26.0, 26.2, 18.7.2; **reopened 2026-08-04**. Every report is a
+    Home Screen web app, so a normal Safari tab should be unaffected — but this page uses
+    `viewport-fit=cover` and `max(9.5px, calc(env(safe-area-inset-top) + 9.5px))`, which
+    collapses to 9.5 px if the inset ever returns 0, putting the menu control under the
+    Dynamic Island. Worth a glance on any new iOS version.
+  - [301108](https://bugs.webkit.org/show_bug.cgi?id=301108) — `<body>` CSS-variable changes
+    do not reach the native chrome until reload. Does not apply: no `<body>`-driven tint any
+    more.
   - [303167](https://bugs.webkit.org/show_bug.cgi?id=303167) — inset extension is wrong for
-    dialogs/overlays using gradients or complex `backdrop-filter`. Avoid both on any anchor.
-  - [305546](https://bugs.webkit.org/show_bug.cgi?id=305546) — Safari 26.2, fixed-header
-    status-bar colour reverts after swipe-back / SPA routing. Low risk here: single document,
-    no client-side routing.
+    dialogs and overlays using gradients or complex `backdrop-filter`. This page uses no
+    `backdrop-filter` at all; keep it that way, since one anywhere in an edge lineage forces
+    `PredominantColorType::Multiple`.
+  - [305546](https://bugs.webkit.org/show_bug.cgi?id=305546) — fixed-header status-bar colour
+    reverts after swipe-back / SPA routing. Low risk: single document, no client-side routing.
   - [302272](https://bugs.webkit.org/show_bug.cgi?id=302272) (dup of
-    [300965](https://bugs.webkit.org/show_bug.cgi?id=300965)) — resolved, but the fix is about
-    structural dialog/backdrop open-close. It must **not** be read as "arbitrary dynamic
-    background colours now re-sample".
-- Safari release notes for 26.1, 26.2 and 26.3 contain no fix for JS-driven background-colour
-  re-sampling. The whole mechanism is an unstandardised internal heuristic introduced as
-  "prototyping only" SPI, and its constants (`0.1`, `10`, `0.9`, `4`) can change without
-  notice. It should stay a progressive enhancement, never an acceptance criterion.
+    [300965](https://bugs.webkit.org/show_bug.cgi?id=300965)) — resolved in 26.2, but the fix
+    is about structural dialog/backdrop open-close. It must **not** be read as "arbitrary
+    dynamic background colours now re-sample".

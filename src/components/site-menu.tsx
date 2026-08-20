@@ -87,13 +87,12 @@ export function SiteMenu({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <>
       <div data-app-shell ref={appShellRef}>
-        {/* Safari 26 colours its status bar and toolbar from a `position: fixed` layer
-            rather than from `theme-color`; these are that layer, one per window edge.
-            They are opaque, and painted the mean colour of the surface behind them, because
-            WebKit discards a near-transparent box rather than sampling it. See
-            `.chrome-tint` in globals.css. */}
-        <div aria-hidden="true" className="chrome-tint" data-edge="top" />
-        <div aria-hidden="true" className="chrome-tint" data-edge="bottom" />
+        {/* Safari 26 fills its status bar and toolbar from a `position: fixed` layer at the
+            window edge, which the pinned chapter plate would otherwise supply. These two
+            boxes take the edge hit test and fail it, so the bars keep the photograph behind
+            them instead of a band of colour. See `.chrome-shield` in globals.css. */}
+        <div aria-hidden="true" className="chrome-shield" data-edge="top" />
+        <div aria-hidden="true" className="chrome-shield" data-edge="bottom" />
         {children}
         <button
           aria-label="メニューを開く"

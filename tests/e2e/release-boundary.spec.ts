@@ -132,117 +132,119 @@ for (const viewport of [
 }
 
 /**
- * Safari 26 no longer reads `theme-color`. It colours its status bar and toolbar from the
- * `background-color` of a `position: fixed` element at that edge of the window, falling
- * back to the body — and only one it can see: the same anchors, hidden at `z-index: -1`
- * under the opaque paper canvas, were never sampled, so both bars stayed paper-coloured
- * over every photograph. They are `opacity: 0` now, and the scroll owner composites each
- * one from the artwork its own bar is drawn over rather than from a per-chapter constant.
+ * Safari 26 dropped `theme-color` for two heuristic modes at each window edge: with no
+ * qualifying `position: fixed` or `sticky` box there, the bar stays translucent and the
+ * page shows through it; with one, the bar is filled opaquely with a colour sampled from
+ * it. DA-MEDIA-01 runs photography to both edges, so the fill is a band across the
+ * artwork and the page wants the translucent mode.
  *
- * The invariant is that each anchor's colour matches the page behind its bar; the check is
- * a pixel read because the defect was a colour, not a layout. The bound is the sampled
- * bands themselves: the swept worst case is 44 at 390 × 844, 15 at 1440 × 900 and 46 at
- * 768 × 1024, all of them at a chapter boundary where the silhouette is genuinely part
- * paper, so 60 leaves room for a frame of scroll latency and nothing more.
+ * `.chapter-photo-pin` would supply the fill on its own — it is `position: fixed; inset: 0`,
+ * exactly window-sized, and a CSS mask does not affect hit testing, so it answers the edge
+ * hit test even where its silhouette is transparent. `.chrome-shield` takes that hit and
+ * fails the candidate test, and because the sampler then walks the lineage of the box it
+ * hit, the walk ends at `html` without ever reaching the plate.
+ *
+ * This asserts the predicate WebKit applies, not the result: `fixedContainerEdges()` and
+ * `containerEdgeCandidateResult()` in Source/WebCore/page/LocalFrameView.cpp. Playwright
+ * has no native browser chrome and never runs that Cocoa path, so a green run means the
+ * page cannot supply an edge colour — never that the bars look right on a device. The
+ * companion half, that the shields paint nothing, is the visual suite: they are absent
+ * from every baseline. See docs/ios26-tint-root-cause.md.
  */
-test("keeps each browser bar tinted from the surface behind it", async ({ page }) => {
+test("offers Safari no colour for either browser bar", async ({ page }) => {
   await page.setViewportSize({ height: 844, width: 390 });
   await page.goto("/", { waitUntil: "networkidle" });
 
-  // The chapter photography is deferred, and an undecoded frame is a different colour
-  // from a decoded one — the masked window paints `--chapter-tone` until it arrives, and
-  // the tint follows it there. Both states are correct, so the sweep below states which
-  // one it is measuring: every frame is armed by one pass to the end of the document and
-  // the assertions do not start until all four have decoded.
-  const documentHeight = await page.evaluate(
-    () => document.documentElement.scrollHeight,
-  );
-  for (let armed = 0; armed <= documentHeight; armed += 800) {
-    // Stepped, not jumped: the production preloader arms a chapter from an intersection
-    // observer, so a chapter the page never passes through is never asked to load.
-    await page.evaluate((y) => window.scrollTo(0, y), armed);
-    await page.waitForTimeout(60);
-  }
-  await page.waitForFunction(() =>
-    [...document.querySelectorAll<HTMLImageElement>(".chapter-photo-pin img")].every(
-      (image) => image.complete && image.naturalWidth > 0,
-    ),
-  );
-
-  // Two samples inside each surface the page presents, clear of the seams: the chapter
-  // silhouettes blend two photographs there, so no single colour is the right answer and
-  // the recorded sweep in docs/visual-fidelity-defects.md is what covers those frames.
+  // The plate only reaches the window edges once a chapter is on screen, and the failure
+  // this guards against is per-scroll-position, so the sweep is the one the tint check
+  // used: two samples inside each surface the page presents, clear of the seams.
   for (const offset of [0, 800, 2800, 3200, 3800, 4200, 4600, 5000]) {
-    // The tint is written from a frame loop that sleeps when the document stops moving,
-    // so the position is approached rather than jumped to: the second scroll always
-    // raises an event and the loop always renders the frame this assertion reads.
-    await page.evaluate((y) => window.scrollTo(0, Math.max(0, y - 8)), offset);
-    await page.waitForTimeout(80);
     await page.evaluate((y) => window.scrollTo(0, y), offset);
+    await page.waitForTimeout(80);
 
-    let previous = "";
-    let settled = 0;
-    for (let attempt = 0; attempt < 60 && settled < 4; attempt += 1) {
-      await page.waitForTimeout(25);
-      const current = await page.evaluate(() =>
-        [...document.querySelectorAll(".chrome-tint")]
-          .map((layer) => layer.getAttribute("data-tint") ?? "")
-          .join("|"),
-      );
-      settled = current === previous ? settled + 1 : 0;
-      previous = current;
-    }
-    // WebKit occasionally composites the new scroll position a frame or two after the
-    // value settles, and the strips below are read from the composited frame.
-    await page.waitForTimeout(400);
+    const edges = await page.evaluate(() => {
+      // `sampleRectMargin` in LocalFrameView.cpp: the sampled point is the midpoint of
+      // each edge, inset by this much.
+      const MARGIN = 4;
+      // `compareWithViewportSize()`: below this share of the window on a side the box is
+      // `Smaller`, and a box that is `Smaller` on both is `TooSmall` — not a candidate.
+      const MINIMUM_RATIO = 0.9;
 
-    const tints = await page.evaluate(() => {
-      const layers = [...document.querySelectorAll(".chrome-tint")];
-      if (layers.length !== 2) throw new Error("both chrome tint anchors are required");
-      return layers.map((layer) => {
-        const style = getComputedStyle(layer);
-        const box = layer.getBoundingClientRect();
-        // The conditions `LocalFrameView::fixedContainerEdges()` actually applies, read
-        // from WebKit rather than from the community write-ups the earlier versions of
-        // this guard encoded. Both previous regressions are covered: `z-index: -1` put the
-        // anchor under the paper canvas so the edge hit test never landed on it, and
-        // `opacity: 0` put it below `isHiddenOrNearlyTransparent()`'s 0.1 floor, which
-        // discards the box outright. See docs/ios26-tint-root-cause.md.
-        //
-        // This is a static check of the predicate, not evidence that Safari honours it.
-        // Playwright's WebKit has no native browser chrome and never runs the Cocoa
-        // sampling path, so a green run here means "the anchor qualifies and the colour we
-        // computed is the colour on screen" — never "the bars are correct on the device".
-        if (style.position !== "fixed")
-          throw new Error("an anchor is not viewport-fixed");
-        if (Number(style.zIndex) < 0)
-          throw new Error("an anchor is painted below the page");
-        if (!(Number(style.opacity) >= 0.1))
-          throw new Error("an anchor is too transparent for WebKit to sample");
-        if (!(box.height > 10))
-          throw new Error("an anchor is thin enough to read as a border");
-        if (!(box.width >= window.innerWidth * 0.9))
-          throw new Error("an anchor is too narrow to own its window edge");
-        const parts = style.backgroundColor.match(/[\d.]+/g);
-        if (!parts) throw new Error("a chrome tint anchor has no colour");
-        return parts.slice(0, 3).map(Number);
+      const isViewportConstrained = (element: Element) => {
+        const position = getComputedStyle(element).position;
+        return position === "fixed" || position === "sticky";
+      };
+
+      return (["top", "bottom"] as const).map((edge) => {
+        const x = window.innerWidth / 2;
+        const y = edge === "top" ? MARGIN : window.innerHeight - MARGIN;
+
+        // The sampler's first pass carries `IgnoreCSSPointerEventsProperty`, which
+        // `elementFromPoint` cannot. The shields are `pointer-events: none`, so the
+        // property is lifted for the read and restored immediately after it.
+        const shields = [...document.querySelectorAll<HTMLElement>(".chrome-shield")];
+        const restore = shields.map((shield) => shield.style.pointerEvents);
+        for (const shield of shields) shield.style.pointerEvents = "auto";
+        const hit = document.elementFromPoint(x, y);
+        for (const [index, shield] of shields.entries()) {
+          shield.style.pointerEvents = restore[index];
+        }
+
+        // What the sampler would find: the first fixed or sticky box in the lineage of
+        // the box it hit that is not `Smaller` on both axes.
+        let candidate: string | null = null;
+        for (
+          let element: Element | null = hit;
+          element;
+          element = element.parentElement
+        ) {
+          if (!isViewportConstrained(element)) continue;
+          const box = element.getBoundingClientRect();
+          const narrow = box.width < window.innerWidth * MINIMUM_RATIO;
+          const short = box.height < window.innerHeight * MINIMUM_RATIO;
+          if (narrow && short) continue;
+          candidate = element.className || element.tagName;
+          break;
+        }
+
+        const shield = document.querySelector<HTMLElement>(
+          `.chrome-shield[data-edge="${edge}"]`,
+        );
+        const box = shield?.getBoundingClientRect();
+        const style = shield ? getComputedStyle(shield) : null;
+        return {
+          background: style?.backgroundColor ?? "",
+          candidate,
+          coversPoint: Boolean(
+            box && box.left <= x && box.right >= x && box.top <= y && box.bottom >= y,
+          ),
+          position: style?.position ?? "",
+          smallerOnBothAxes: Boolean(
+            box &&
+            box.width < window.innerWidth * MINIMUM_RATIO &&
+            box.height < window.innerHeight * MINIMUM_RATIO,
+          ),
+          takesTheHit: hit === shield,
+        };
       });
     });
 
-    for (const [index, bar] of (["status bar", "toolbar"] as const).entries()) {
-      const frame = await page.screenshot({
-        clip: { height: 60, width: 390, x: 0, y: index === 0 ? 0 : 784 },
-      });
-      const { channels } = await sharp(frame).removeAlpha().stats();
-      const distance = Math.round(
-        Math.sqrt(
-          channels.slice(0, 3).reduce((total, channel, channelIndex) => {
-            const delta = channel.mean - tints[index][channelIndex];
-            return total + delta * delta;
-          }, 0),
-        ),
+    for (const [index, edge] of (["top", "bottom"] as const).entries()) {
+      const state = edges[index];
+      const where = `${edge} edge at scrollY ${offset}`;
+      expect(state.position, `${where}: shield is viewport-fixed`).toBe("fixed");
+      expect(state.coversPoint, `${where}: shield covers the sampled point`).toBe(true);
+      expect(state.takesTheHit, `${where}: shield takes the edge hit`).toBe(true);
+      // Without a background the shield is `IsHiddenOrTransparent`, which sets
+      // `retryHonoringPointerEvents` — and that retry steps over it to the plate.
+      expect(state.background, `${where}: shield declares a background`).not.toBe(
+        "rgba(0, 0, 0, 0)",
       );
-      expect(distance, `${bar} tint at scrollY ${offset}`).toBeLessThan(60);
+      expect(
+        state.smallerOnBothAxes,
+        `${where}: shield is TooSmall rather than a candidate`,
+      ).toBe(true);
+      expect(state.candidate, `${where}: nothing qualifies as a fixed edge`).toBeNull();
     }
   }
 });

@@ -571,74 +571,72 @@ main[data-page="moyoy-lp"] {
   overflow: clip;
 }
 
-/* Safari 26 dropped `theme-color` and derives the status bar and toolbar tint from the
-   page instead. `LocalFrameView::fixedContainerEdges()` hit-tests a single point per
-   window edge — the midpoint of that edge, inset 4 px — walks up from whatever it hits
-   until it finds a `position: fixed` or `sticky` box, and reads that box's declared
-   `background-color`. The box has to cover more than 90 % of the window along the sampled
-   edge and to be over 10 px on both sides of its border box, below which it reads as a
-   border and is skipped. The sample falls back to the body when nothing qualifies, which
-   is why the four full-window chapter plates — transparent, with the photograph on an
-   absolutely positioned child — are not the source. These two anchors are, one per edge,
-   so a window showing two different surfaces no longer has to choose one colour for both
-   bars.
+/* Safari 26 dropped `theme-color` and runs one of two modes over each window edge. If it
+   finds no qualifying `position: fixed` or `sticky` box at that edge it leaves the bar
+   translucent and the page shows through it; if it finds one it samples a colour and fills
+   the bar with it opaquely. This page wants the first mode — DA-MEDIA-01's photography runs
+   to both window edges, and any fill is a band across it.
 
-   The anchors have failed twice, each time by being invisible in a different way, and
-   neither time for the assumed reason. At `z-index: -1` they sat under the opaque paper
-   canvas and were never the box the hit test landed on. At `opacity: 0` they were that box
-   and were discarded anyway: `isHiddenOrNearlyTransparent()` rejects anything below
-   `opacity: 0.1`, and WebKit regression-tests this exact element — fixed, full width,
-   `opacity: 0`, `pointer-events: none` — under the name
-   `color-sampling-ignores-transparent-pointer-events-none-container`. The widely repeated
-   claim that only `display: none` stops the sampling is false.
+   Nothing on the page asks for the fill, but `.chapter-photo-pin` supplies it anyway. It is
+   `position: fixed; inset: 0`, so it is exactly window-sized, which `containerEdgeCandidateResult()`
+   classifies as `IsViewportSizedCandidate` — a match. Masking does not save it: a CSS mask
+   does not affect hit testing, so the plate answers the edge hit test even where its
+   silhouette is fully transparent, which is why one chapter's tone used to be painted into
+   both bars for the whole document.
 
-   So the anchor is opaque, and the colour it is painted is the mean of the surface directly
-   behind it. That is not enough on its own: the mean matches but the texture does not, and
-   measured against the approved frames a flat band is 63–127 of RGB distance per pixel from
-   the photograph it covers. It is only invisible while the browser chrome is over it
-   (60 px of status bar, 90 px of toolbar — `page-motion.tsx`), which is not a state the page
-   controls. The mask below is what makes it unconditional, and it is free: WebKit samples
-   the box's *declared* `background-color`, and neither `isHiddenOrNearlyTransparent()` nor
-   the candidate test looks at masking — only at `opacity` and `visibility`. So the anchor
-   reads at full strength to the browser and fades to nothing for the reader.
+   These two boxes take that hit instead. `fixedContainerEdges()` hit-tests one point per
+   edge — the midpoint, inset 4 px — and then walks up the *lineage of whatever it hit*. A
+   box that fails the candidate test does not hand the edge back to the rest of the page; the
+   walk simply continues to that box's own ancestors, and ours are `[data-app-shell]`, `body`
+   and `html`, none of them fixed. So the walk ends with no candidate, the edge has no colour,
+   and the bar stays translucent.
 
-   `pointer-events: none` is safe here: the first hit test runs with
-   `IgnoreCSSPointerEventsProperty`, so the property only decides anything for a box that
-   has already been rejected on other grounds.
+   Failing the test is the whole job, and `TooSmall` is the way to fail it that has no side
+   effects. `compareWithViewportSize()` returns `Smaller` below 90 % of the window on a side;
+   at 24 px these are `Smaller` on both, which is `TooSmall`. Two details matter and neither is
+   free to change:
 
-   The scroll owner points `--chrome-tint` at the surface each bar is drawn over; the
-   paper page is the no-JavaScript floor. See docs/ios26-tint-root-cause.md. */
-.chrome-tint {
+   - `TooSmall` is one of the three results that do *not* set `retryHonoringPointerEvents`.
+     `IsHiddenOrTransparent` does, and a retry hit test skips `pointer-events: none` boxes —
+     it would step over these and find the plate. That is why there is a `background-color`
+     here: without a background the box is `IsHiddenOrTransparent` instead, and the retry
+     brings the band straight back.
+   - The colour is never read. `primaryBackgroundColorForRenderer()` returns nothing once
+     `compareWithViewportSize()` says `Smaller`, so any colour would do; it is the paper so
+     that a reader who defeats the mask sees the page's own ground.
+
+   The mask is what makes them paint nothing, and it is invisible to all of this: grep the
+   whole of `fixedContainerEdges()` and the only properties it consults are `visibility`,
+   `opacity`, background, `backdrop-filter`, `z-index`, `pointer-events` and the border box.
+   `clip-path` would not do — `RenderLayer::hitTestLayer()` calls `hitTestClipPath()`
+   explicitly, and a clipped-away box is not hit at all.
+
+   See docs/ios26-tint-root-cause.md. */
+.chrome-shield {
   position: fixed;
-  /* Above every painted layer on the page, so the hit test at the window edge lands here
-     rather than on the chapter plate — which, being window-sized, sends WebKit down the
-     `preferExistingColor` branch and freezes the bar at the colour it already had. */
+  /* Above every painted layer, so the edge hit test lands here and not on the plate. */
   z-index: 120;
-  left: 0;
-  width: 100%;
-  /* Over the 10 px floor with room to spare, and still inside the chrome-covered band. */
-  height: 16px;
-  background-color: var(--chrome-tint, var(--paper));
-  /* Stated rather than left to the initial value: this is the constraint the anchor has
-     already been broken on once, and anything below 0.1 silently stops the sampling. */
+  /* Centred on the sampled point, and far enough inside 90 % of the narrowest supported
+     window (320 px) that `Smaller` is not a close call on either axis. */
+  left: calc(50% - 12px);
+  width: 24px;
+  height: 24px;
+  /* Present so the box is classified by size rather than as hidden — see above. */
+  background-color: var(--paper);
   opacity: 1;
+  visibility: visible;
   pointer-events: none;
+  /* Entirely transparent: not one pixel is painted, and no gate in the sampler reads a mask. */
+  -webkit-mask-image: linear-gradient(#0000, #0000);
+  mask-image: linear-gradient(#0000, #0000);
 }
 
-/* Solid for the first 4 px — the sample point is at 4 px, and that strip is the deepest
-   inside the status bar and the home indicator, where nothing is ever read — then out to
-   nothing across the remaining 12 px, so the seam against the photograph is a gradient
-   rather than an edge. */
-.chrome-tint[data-edge="top"] {
+.chrome-shield[data-edge="top"] {
   top: 0;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0 4px, transparent);
-  mask-image: linear-gradient(to bottom, #000 0 4px, transparent);
 }
 
-.chrome-tint[data-edge="bottom"] {
+.chrome-shield[data-edge="bottom"] {
   bottom: 0;
-  -webkit-mask-image: linear-gradient(to top, #000 0 4px, transparent);
-  mask-image: linear-gradient(to top, #000 0 4px, transparent);
 }
 
 .chapter-photo-pin picture {

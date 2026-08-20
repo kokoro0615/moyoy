@@ -2,8 +2,6 @@
 
 import { useEffect } from "react";
 
-import { paperTint } from "@/lib/implementation-contract";
-
 /**
  * Single owner for every scroll-linked transform on the landing page.
  *
@@ -25,31 +23,6 @@ const IDLE_FRAMES = 12;
 
 /** Viewport width below which the compact travels apply. */
 const COMPACT_WIDTH = 640;
-
-/**
- * Depth of the strips a mobile browser draws its own furniture over: iOS reserves about
- * 60 px above for the status bar and about 90 px below for the toolbar. Each bar takes
- * the colour of the page at the middle of its own strip.
- */
-const STATUS_BAR = 60;
-const TOOL_BAR = 90;
-
-/**
- * The colour a browser bar is drawn over is read out of the artwork behind it rather than
- * from a table: every frame, silhouette mask and paper foreground is drawn once into a
- * small offscreen canvas and reduced to a ramp of mean RGBA down its height. Colour comes
- * from the photographs, coverage from the alpha of the masks and the foreground, and the
- * two are composited in paint order for exactly the band each bar covers.
- *
- * A per-chapter constant cannot do this. At a wide window the plate traverses more than
- * half of its frame while the chapter is on screen — DUSK runs from its lit sun to its
- * dark forest — and at every chapter boundary the silhouette is part paper, which is how
- * a bar ended up black over a cream page. `RAMP_ROWS` against the shortest shipped frame
- * is one entry per ~9 source px, finer than either bar; the columns are averaged per row,
- * so the ramp does not depend on how an engine filters a downscale.
- */
-const RAMP_ROWS = 192;
-const RAMP_COLUMNS = 24;
 
 /** Widths the artboard is authored against, and above which it is zoomed. */
 const ARTBOARD_WIDTH = 1200;
@@ -120,32 +93,6 @@ interface PanTarget {
 interface Band {
   bottom: number;
   top: number;
-}
-
-/**
- * One chapter, everything the chrome tint needs about it. The geometry is cached by
- * `measure()` in viewport px, which is what the sample points are expressed in and what
- * keeps the artboard `zoom` out of the arithmetic.
- */
-interface ChapterSurface {
-  readonly section: HTMLElement;
-  /** Document band the chapter occupies. */
-  bottom: number;
-  top: number;
-  /** Rendered box of the photograph inside the pinned plate. */
-  imageHeight: number;
-  pinTop: number;
-  /** Share of the frame that is off-plate and therefore traversed by the pan. */
-  overflowRatio: number;
-  /** Colour ramp of the photograph; null until the frame has decoded. */
-  frame: Uint8ClampedArray | null;
-  /** Alpha ramp of the silhouette that clips it, over the chapter's own document band. */
-  mask: Uint8ClampedArray | null;
-}
-
-/** A paper layer painted over the chapters, with the alpha ramp of its own artwork. */
-interface PaperBand extends Band {
-  ramp: Uint8ClampedArray | null;
 }
 
 /**
@@ -245,144 +192,6 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-/** `RAMP_ROWS` mean RGBA values down an image, taken once per decoded source. */
-const rampCache = new Map<string, Uint8ClampedArray | null>();
-
-/**
- * Reduce a decoded image to one mean RGBA per horizontal band. The draw is the only
- * expensive step and it happens once per source, off the animation path.
- */
-function readRamp(image: CanvasImageSource, key: string): Uint8ClampedArray | null {
-  const cached = rampCache.get(key);
-  if (cached !== undefined) return cached;
-  const canvas = document.createElement("canvas");
-  canvas.width = RAMP_COLUMNS;
-  canvas.height = RAMP_ROWS;
-  const context = canvas.getContext("2d");
-  if (!context) return null;
-  let pixels: Uint8ClampedArray;
-  try {
-    context.drawImage(image, 0, 0, RAMP_COLUMNS, RAMP_ROWS);
-    pixels = context.getImageData(0, 0, RAMP_COLUMNS, RAMP_ROWS).data;
-  } catch {
-    // Every source here is same-origin and cannot taint the canvas, but a frame that has
-    // not decoded can still throw. The chapter's own `--chapter-tone` stays in force, and
-    // the failure is cached so the animation path never retries it.
-    rampCache.set(key, null);
-    return null;
-  }
-  const ramp = new Uint8ClampedArray(RAMP_ROWS * 4);
-  for (let row = 0; row < RAMP_ROWS; row += 1) {
-    for (let channel = 0; channel < 4; channel += 1) {
-      let total = 0;
-      for (let column = 0; column < RAMP_COLUMNS; column += 1) {
-        total += pixels[(row * RAMP_COLUMNS + column) * 4 + channel];
-      }
-      ramp[row * 4 + channel] = total / RAMP_COLUMNS;
-    }
-  }
-  rampCache.set(key, ramp);
-  return ramp;
-}
-
-/** Ramp an image the page only references from CSS. Resolves from the HTTP cache. */
-function loadRamp(url: string, done: () => void) {
-  if (rampCache.has(url)) return;
-  const image = new Image();
-  image.decoding = "async";
-  image.addEventListener("load", () => {
-    readRamp(image, url);
-    done();
-  });
-  image.addEventListener("error", () => {
-    rampCache.set(url, null);
-  });
-  image.src = url;
-}
-
-const hexChannel = (value: number) =>
-  Math.round(clamp(value, 0, 255))
-    .toString(16)
-    .padStart(2, "0");
-
-/** Row span of a ramp covering `[from, to]` of a box that runs `start` to `end`. */
-function rampRows(start: number, end: number, from: number, to: number) {
-  const height = end - start;
-  if (height <= 0) return null;
-  const first = clamp(
-    Math.floor(((from - start) / height) * RAMP_ROWS),
-    0,
-    RAMP_ROWS - 1,
-  );
-  const last = clamp(
-    Math.ceil(((to - start) / height) * RAMP_ROWS) - 1,
-    first,
-    RAMP_ROWS - 1,
-  );
-  return { first, last };
-}
-
-/** Mean colour of `[from, to]` within a box, or null while the ramp is unavailable. */
-function rampColour(
-  ramp: Uint8ClampedArray | null,
-  start: number,
-  end: number,
-  from: number,
-  to: number,
-): [number, number, number] | null {
-  const rows = ramp && rampRows(start, end, from, to);
-  if (!ramp || !rows) return null;
-  const channels: [number, number, number] = [0, 0, 0];
-  for (let row = rows.first; row <= rows.last; row += 1) {
-    for (let channel = 0; channel < 3; channel += 1) {
-      channels[channel] += ramp[row * 4 + channel];
-    }
-  }
-  const span = rows.last - rows.first + 1;
-  return [channels[0] / span, channels[1] / span, channels[2] / span];
-}
-
-/**
- * How much of the band `[from, to]` a layer occupying `[start, end]` actually paints:
- * the share of the band inside the box, scaled by the mean alpha of its artwork there. A
- * layer with no ramp yet is taken as opaque inside its own box, which is the model the
- * menu control already uses.
- */
-function rampCoverage(
-  ramp: Uint8ClampedArray | null,
-  start: number,
-  end: number,
-  from: number,
-  to: number,
-) {
-  const overlap = Math.min(end, to) - Math.max(start, from);
-  const span = to - from;
-  if (overlap <= 0 || span <= 0) return 0;
-  const share = overlap / span;
-  const rows = rampRows(start, end, Math.max(start, from), Math.min(end, to));
-  if (!ramp || !rows) return share;
-  let alpha = 0;
-  for (let row = rows.first; row <= rows.last; row += 1) alpha += ramp[row * 4 + 3];
-  return (share * alpha) / ((rows.last - rows.first + 1) * 255);
-}
-
-/** `#rrggbb` from a custom property, so a measured constant can enter the composite. */
-function parseHex(value: string): [number, number, number] | null {
-  const match = /^#([\da-f]{6})$/i.exec(value.trim());
-  if (!match) return null;
-  const packed = Number.parseInt(match[1], 16);
-  return [(packed >> 16) & 255, (packed >> 8) & 255, packed & 255];
-}
-
-const paperRGB = parseHex(paperTint) ?? [236, 231, 216];
-
-/** The silhouette a chapter is clipped by, named only in the stylesheet. */
-function maskSourceOf(photo: HTMLElement) {
-  const style = getComputedStyle(photo);
-  const declared = style.maskImage || style.webkitMaskImage || "";
-  return /url\(["']?([^"')]+)["']?\)/.exec(declared)?.[1] ?? null;
-}
-
 export function PageMotion() {
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -391,12 +200,8 @@ export function PageMotion() {
     /** Document bands whose surface is photography rather than the paper page. */
     const mediaBands: Band[] = [];
     /** Paper artwork that is painted over a chapter and hides the photograph behind it. */
-    const paperBands: PaperBand[] = [];
-    /** The chapters behind `mediaBands`, index for index, with what tints their bars. */
-    const chapterSurfaces: ChapterSurface[] = [];
+    const paperBands: Band[] = [];
     let menuControl: HTMLElement | null = null;
-    let themeColor: HTMLMetaElement | null = null;
-    let chromeTints: HTMLElement[] = [];
     /** The control is `position: fixed`, so its window band is constant. */
     let menuBand: Band | null = null;
     let loopFrame = 0;
@@ -424,7 +229,6 @@ export function PageMotion() {
       pans.length = 0;
       mediaBands.length = 0;
       paperBands.length = 0;
-      chapterSurfaces.length = 0;
 
       for (const plan of contourPlan) {
         const stack = document.querySelector<HTMLElement>(plan.selector);
@@ -475,8 +279,6 @@ export function PageMotion() {
       }
 
       menuControl = document.querySelector<HTMLElement>(".menu-open-button");
-      themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-      chromeTints = [...document.querySelectorAll<HTMLElement>(".chrome-tint")];
     }
 
     function reset() {
@@ -534,36 +336,6 @@ export function PageMotion() {
       for (const chapter of document.querySelectorAll<HTMLElement>("[data-chapter]")) {
         const box = chapter.getBoundingClientRect();
         mediaBands.push({ bottom: box.bottom + scrollY, top: box.top + scrollY });
-
-        // Everything the chrome tint needs, read here so the animation path never does.
-        // The plate is viewport-fixed, so its box is the window; the frame inside it is
-        // taller than the window by the share the pan traverses.
-        const pin = chapter.querySelector<HTMLElement>(".chapter-photo-pin");
-        const image = chapter.querySelector<HTMLImageElement>(".chapter-photo-pin img");
-        const pinBox = pin?.getBoundingClientRect();
-        const imageHeight = image?.getBoundingClientRect().height ?? 0;
-        // The silhouette is a CSS mask, so its file is only named in the stylesheet. It
-        // is already in the HTTP cache by the time the chapter paints; ramping it needs a
-        // second measure, which the loader asks for once the alpha is available.
-        const photo = chapter.querySelector<HTMLElement>(".chapter-photo");
-        const maskUrl = photo ? maskSourceOf(photo) : null;
-        if (maskUrl) loadRamp(maskUrl, requestMeasure);
-        chapterSurfaces.push({
-          bottom: box.bottom + scrollY,
-          frame:
-            image?.complete && image.naturalWidth > 0
-              ? readRamp(image, image.currentSrc)
-              : null,
-          imageHeight,
-          mask: maskUrl ? (rampCache.get(maskUrl) ?? null) : null,
-          overflowRatio:
-            imageHeight > 0
-              ? Math.max(0, (imageHeight - viewportHeight) / imageHeight)
-              : 0,
-          pinTop: pinBox?.top ?? 0,
-          section: chapter,
-          top: box.top + scrollY,
-        });
       }
 
       // The ROOT chapter box starts about 260 px above the photograph the reader sees:
@@ -575,15 +347,7 @@ export function PageMotion() {
         ".root-foreground",
       )) {
         const box = foreground.getBoundingClientRect();
-        const artwork = foreground.querySelector<HTMLImageElement>("img");
-        paperBands.push({
-          bottom: box.bottom + scrollY,
-          ramp:
-            artwork?.complete && artwork.naturalWidth > 0
-              ? readRamp(artwork, artwork.currentSrc)
-              : null,
-          top: box.top + scrollY,
-        });
+        paperBands.push({ bottom: box.bottom + scrollY, top: box.top + scrollY });
       }
 
       if (menuControl) {
@@ -618,131 +382,9 @@ export function PageMotion() {
       if (menuControl.dataset.overMedia !== next) menuControl.dataset.overMedia = next;
     }
 
-    /**
-     * Safari 26 no longer reads `theme-color`. It derives the tint of each browser bar
-     * from the `background-color` of a `position: fixed` element at that edge of the
-     * window, falling back to the body — and only from one it would actually draw, which
-     * the two `.chrome-tint` anchors were not, first buried at `z-index: -1` under the
-     * opaque paper canvas and then at `opacity: 0`. Both bars stayed one colour over every
-     * photograph as a result. The anchors are opaque now; this points each of them at the
-     * surface its own bar is drawn over — sampled independently, so a window showing a seam
-     * no longer has to choose.
-     *
-     * Writing the colour here is what makes the bars follow the page: a fixed layer is not
-     * re-sampled by scrolling alone, but repainting it marks the window edges dirty and the
-     * next commit re-derives them. See docs/ios26-tint-root-cause.md.
-     *
-     * The colour is read out of the photograph rather than from a per-chapter constant.
-     * The plate is viewport-fixed and the frame inside it pans, so the rows under a bar
-     * move while the chapter is on screen: at 1440 × 900 the DUSK frame travels from its
-     * lit sun to its dark forest, and no constant is both. The frame's own ramp plus the
-     * pan offset gives the exact band, and the measured constants stay as the floor for
-     * the frames that have not decoded yet.
-     */
-    function renderChromeSurface(scrollY: number) {
-      const height = window.innerHeight;
-
-      /**
-       * The photograph under the window rows `[from, to]`. The plate is pinned to the
-       * window and the frame is translated inside it by the pan, so those rows map onto
-       * the frame by subtracting the pan — no layout is read to do it. Until the frame
-       * decodes there is no ramp and the answer is `--chapter-tone`, which is exactly what
-       * the masked window is painting in the meantime.
-       */
-      const colourOf = (surface: ChapterSurface, from: number, to: number) => {
-        const travel = surface.bottom - surface.top + height;
-        const progress =
-          reducedMotion.matches || travel <= 0
-            ? 0
-            : clamp((scrollY - (surface.top - height)) / travel, 0, 1);
-        const imageTop =
-          surface.pinTop -
-          progress * surface.overflowRatio * CHAPTER_PAN_STRENGTH * surface.imageHeight;
-        return (
-          rampColour(
-            surface.frame,
-            imageTop,
-            imageTop + surface.imageHeight,
-            from,
-            to,
-          ) ??
-          parseHex(
-            getComputedStyle(surface.section).getPropertyValue("--chapter-tone"),
-          ) ??
-          paperRGB
-        );
-      };
-
-      /**
-       * Composite the band in paint order — paper foreground, then the chapters, whose
-       * DOM order is their z-order — and let the page ground take whatever is left. This
-       * is what stops a bar from turning the colour of a photograph the silhouette has
-       * not opened yet: at a chapter boundary the coverage is partial and the tint stays
-       * mostly paper, which is what the reader sees there.
-       */
-      const barTint = (from: number, to: number) => {
-        const channels: [number, number, number] = [0, 0, 0];
-        let remaining = 1;
-        const paint = (colour: readonly [number, number, number], coverage: number) => {
-          const share = clamp(coverage, 0, 1) * remaining;
-          for (let channel = 0; channel < 3; channel += 1) {
-            channels[channel] += colour[channel] * share;
-          }
-          remaining -= share;
-        };
-
-        for (const band of paperBands) {
-          if (remaining <= 0.002) break;
-          paint(
-            paperRGB,
-            rampCoverage(
-              band.ramp,
-              band.top,
-              band.bottom,
-              from + scrollY,
-              to + scrollY,
-            ),
-          );
-        }
-        for (const surface of chapterSurfaces) {
-          if (remaining <= 0.002) break;
-          const coverage = rampCoverage(
-            surface.mask,
-            surface.top,
-            surface.bottom,
-            from + scrollY,
-            to + scrollY,
-          );
-          if (coverage <= 0) continue;
-          paint(colourOf(surface, from, to), coverage);
-        }
-        paint(paperRGB, 1);
-        return `#${hexChannel(channels[0])}${hexChannel(channels[1])}${hexChannel(channels[2])}`;
-      };
-
-      const topTint = barTint(0, STATUS_BAR);
-      const bottomTint = barTint(height - TOOL_BAR, height);
-
-      for (const layer of chromeTints) {
-        const next = layer.dataset.edge === "bottom" ? bottomTint : topTint;
-        if (layer.dataset.tint === next) continue;
-        layer.dataset.tint = next;
-        layer.style.setProperty("--chrome-tint", next);
-      }
-      // The body is what Safari falls back to when it finds no anchor, and it is the one
-      // colour both bars would then share. It is invisible either way: `.page-canvas`
-      // covers the document and the overscroll rubber band is painted from the root.
-      if (document.body.style.backgroundColor !== topTint) {
-        document.body.style.backgroundColor = topTint;
-      }
-      // Chrome, Edge and iOS before 26 still honour the meta, and it colours one bar.
-      if (themeColor && themeColor.content !== topTint) themeColor.content = topTint;
-    }
-
     function render() {
       const scrollY = window.scrollY;
       renderControlSurface(scrollY);
-      renderChromeSurface(scrollY);
 
       if (reducedMotion.matches) {
         reset();

@@ -625,7 +625,7 @@
     },
     {
       "path": "tests/visual/__screenshots__/production-1440x900-alpine-visual-chromium-linux.png",
-      "sha256": "e74bd42c2f2773ab788959d0edbd79b5cbae20197bede6e89a755b29ca01080c",
+      "sha256": "9be90e0f478847bcc9f15cc5ec72c17acd1b72fe26fbda7d84f1834f3db56bb1",
       "mediaType": "image/png",
       "classification": "approved-production-baseline",
       "rightsStatus": "approved-public-production-candidate",
@@ -634,7 +634,7 @@
     },
     {
       "path": "tests/visual/__screenshots__/production-1440x900-dawn-visual-chromium-linux.png",
-      "sha256": "3393f59ceffc8cca3cb7a17f4b74528d65d04e0a5d458bfb53663c09f23390a4",
+      "sha256": "79a58ef66ff702ff2da394d42e1526ede3c8973d7114ed3e8c06ca0d0c2c3298",
       "mediaType": "image/png",
       "classification": "approved-production-baseline",
       "rightsStatus": "approved-public-production-candidate",
@@ -688,7 +688,7 @@
     },
     {
       "path": "tests/visual/__screenshots__/production-390x844-alpine-visual-chromium-linux.png",
-      "sha256": "040d859517c7d0079d4e04e1b8a7527dcd7a9eff7ce99708cb6330e1c7586c64",
+      "sha256": "4a59f72c7a7c5aa82be87658e1c5c2631f9e91c05cdb23771a2a278b25d07c62",
       "mediaType": "image/png",
       "classification": "approved-production-baseline",
       "rightsStatus": "approved-public-production-candidate",
@@ -697,7 +697,7 @@
     },
     {
       "path": "tests/visual/__screenshots__/production-390x844-dawn-visual-chromium-linux.png",
-      "sha256": "e82a1e32594cce0ad9a5b22e8473e42b9580f40671c8bee5974abee1665cb010",
+      "sha256": "6db37a4d40d16a3ec3174ef5265fd8ab48905debfba707fbc5a1acaec696341e",
       "mediaType": "image/png",
       "classification": "approved-production-baseline",
       "rightsStatus": "approved-public-production-candidate",
@@ -706,7 +706,7 @@
     },
     {
       "path": "tests/visual/__screenshots__/production-390x844-dusk-visual-chromium-linux.png",
-      "sha256": "409adb7dfb0c4a679abc751eb995755c83059c2810b78311d75bb64f03638e64",
+      "sha256": "73bf474841cd6726954808026957cd894213186e47505d7f3bc4e4e243857405",
       "mediaType": "image/png",
       "classification": "approved-production-baseline",
       "rightsStatus": "approved-public-production-candidate",
@@ -715,7 +715,7 @@
     },
     {
       "path": "tests/visual/__screenshots__/production-390x844-footer-visual-chromium-linux.png",
-      "sha256": "5156beaf75e3b2f204385513102f81bd14a3845c0ac1c62499ee1f4cf24efdd8",
+      "sha256": "8a267ac7d295dcc4bbb4a97f4a79d5c329c30eaf1a7f6c338456a11b6f63457e",
       "mediaType": "image/png",
       "classification": "approved-production-baseline",
       "rightsStatus": "approved-public-production-candidate",
@@ -733,7 +733,7 @@
     },
     {
       "path": "tests/visual/__screenshots__/production-390x844-root-visual-chromium-linux.png",
-      "sha256": "fd912ea7d7be750a08feb219d98b1c838be50d132175bd4d4e6839c3c88d7a3d",
+      "sha256": "3d8079f049538980a70bd250fd0a2c733e6d5b553531e6c6ae729d3b66a1f743",
       "mediaType": "image/png",
       "classification": "approved-production-baseline",
       "rightsStatus": "approved-public-production-candidate",
@@ -751,7 +751,7 @@
     },
     {
       "path": "tests/visual/__screenshots__/production-768x1024-alpine-visual-chromium-linux.png",
-      "sha256": "4020e308d89c801617f79db59c287eaa61e9807460017733d8b7486f02581a33",
+      "sha256": "156db7c3c21bcf2c1f922949332a2f17b6dbfb07912a657903e815c6c5b90b9f",
       "mediaType": "image/png",
       "classification": "approved-production-baseline",
       "rightsStatus": "approved-public-production-candidate",
@@ -760,7 +760,7 @@
     },
     {
       "path": "tests/visual/__screenshots__/production-768x1024-dawn-visual-chromium-linux.png",
-      "sha256": "6b509dac6bcfe17bbe1e5905418bdd96de2daa62b84ded8eaaeeac66f7ec4a5f",
+      "sha256": "fa1b60c37b3438fa93f75d61d65fcdf27ffed6731f857e764c960b701c8e15e5",
       "mediaType": "image/png",
       "classification": "approved-production-baseline",
       "rightsStatus": "approved-public-production-candidate",
@@ -769,7 +769,7 @@
     },
     {
       "path": "tests/visual/__screenshots__/production-768x1024-dusk-visual-chromium-linux.png",
-      "sha256": "c06dbcb6bc627dce88934c2acca6b88bb76fd1f264069f9f616beb84c4e6860c",
+      "sha256": "74f52e77a23d58ce944463038ecca986589d1695d47b6bf3f68d6ad2c3090339",
       "mediaType": "image/png",
       "classification": "approved-production-baseline",
       "rightsStatus": "approved-public-production-candidate",
@@ -796,7 +796,7 @@
     },
     {
       "path": "tests/visual/__screenshots__/production-768x1024-root-visual-chromium-linux.png",
-      "sha256": "8c611773083631cab83fd2b9d8ddcb2116cce80923a19d300e08a7600435c3e2",
+      "sha256": "cb93b23acc8f44689f5017228fd1b55cc50725b66c0ceed35b69d7b5e32d0806",
       "mediaType": "image/png",
       "classification": "approved-production-baseline",
       "rightsStatus": "approved-public-production-candidate",
