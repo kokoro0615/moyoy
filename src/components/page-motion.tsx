@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import { chapterRamps } from "@/lib/moyoy-content";
+
 /**
  * Single owner for every scroll-linked transform on the landing page.
  *
@@ -85,9 +87,45 @@ interface CrossingTarget {
  */
 interface PanTarget {
   readonly element: HTMLElement;
+  /**
+   * The document-level layer that answers the browser-bar strips, carried here because it
+   * is placed by the frame's own geometry: the same box, the same offset. Only its offset
+   * moves per frame, and only through `transform`, so the masked chapter is never
+   * repainted for it.
+   */
+  bleed: HTMLElement | null;
   bottom: number;
+  imageHeight: number;
   overflowRatio: number;
+  /** The frame's vertical colour, read at its two edges to fill the browser-bar strips. */
+  ramp: readonly string[];
   top: number;
+  written: [string, string];
+}
+
+/**
+ * How far past the frame `.chapter-photo-bleed` carries the ramp's two ends. Measured on an
+ * iPhone at 402 x 754: the screen is 874 CSS px, so the browser bars take 120 px between
+ * them with the toolbar retracted and 160 px with it expanded — about 66 above and up to
+ * 94 below. A fixed box is clipped to the window and reaches neither, so the bleed answers
+ * both with room to spare.
+ */
+const CHAPTER_BLEED = 240;
+
+/** Linear read of a colour ramp at `position` in 0…1, returned as an `rgb()` string. */
+function sampleRamp(ramp: readonly string[], position: number): string {
+  if (ramp.length < 2) return "";
+  const scaled = Math.min(Math.max(position, 0), 1) * (ramp.length - 1);
+  const index = Math.min(Math.floor(scaled), ramp.length - 2);
+  const mix = scaled - index;
+  const from = ramp[index];
+  const to = ramp[index + 1];
+  const channel = (offset: number) => {
+    const a = Number.parseInt(from.slice(offset, offset + 2), 16);
+    const b = Number.parseInt(to.slice(offset, offset + 2), 16);
+    return Math.round(a + (b - a) * mix);
+  };
+  return `rgb(${channel(1)} ${channel(3)} ${channel(5)})`;
 }
 
 interface Band {
@@ -275,7 +313,24 @@ export function PageMotion() {
       for (const element of document.querySelectorAll<HTMLElement>(
         ".chapter-photo-pin img",
       )) {
-        pans.push({ bottom: 0, element, overflowRatio: 0, top: 0 });
+        const chapter = element.closest<HTMLElement>("[data-chapter]");
+        const id = chapter?.dataset.chapter as keyof typeof chapterRamps.pc | undefined;
+        pans.push({
+          bleed:
+            element
+              .closest<HTMLElement>(".chapter-photo")
+              ?.querySelector<HTMLElement>(".chapter-photo-bleed") ?? null,
+          bottom: 0,
+          element,
+          imageHeight: 0,
+          overflowRatio: 0,
+          // Which crop is rendered decides which ramp is true of it, and the breakpoint
+          // decides the crop. `collect()` runs from `measure()`, so a resize across it
+          // re-reads this.
+          ramp: id ? chapterRamps[isCompact() ? "sp" : "pc"][id] : [],
+          top: 0,
+          written: ["", ""],
+        });
       }
 
       menuControl = document.querySelector<HTMLElement>(".menu-open-button");
@@ -288,6 +343,10 @@ export function PageMotion() {
       }
       for (const target of pans) {
         target.element.style.setProperty("--chapter-pan-y", "0%");
+        target.bleed?.style.setProperty("--chapter-window", "0px");
+        target.bleed?.style.setProperty("--chapter-bleed", "0px");
+        target.bleed?.style.setProperty("--chapter-window-y", "0px");
+        target.written = ["", ""];
       }
     }
 
@@ -305,6 +364,7 @@ export function PageMotion() {
       // thread is doing, so it is read from there instead.
       const scrollY = -document.documentElement.getBoundingClientRect().top;
       const viewportHeight = window.innerHeight;
+      const scale = scaleOf();
       maximumScroll = Math.max(
         0,
         document.documentElement.scrollHeight - viewportHeight,
@@ -327,10 +387,23 @@ export function PageMotion() {
         const imageHeight = target.element.getBoundingClientRect().height;
         target.top = chapterBox.top + scrollY;
         target.bottom = target.top + chapterBox.height;
+        target.imageHeight = imageHeight;
         target.overflowRatio =
           imageHeight > 0
             ? Math.max(0, (imageHeight - viewportHeight) / imageHeight)
             : 0;
+        // The bleed's content box is the window and its borders are the strips beyond it.
+        // Client rects are window pixels and the layer lives inside the zoomed artboard, so
+        // both lengths are divided back into artboard units the way every other offset
+        // written here is.
+        target.bleed?.style.setProperty(
+          "--chapter-window",
+          `${(viewportHeight / scale).toFixed(2)}px`,
+        );
+        target.bleed?.style.setProperty(
+          "--chapter-bleed",
+          `${(CHAPTER_BLEED / scale).toFixed(2)}px`,
+        );
       }
 
       for (const chapter of document.querySelectorAll<HTMLElement>("[data-chapter]")) {
@@ -416,10 +489,38 @@ export function PageMotion() {
           0,
           1,
         );
+        const pan = -progress * target.overflowRatio * CHAPTER_PAN_STRENGTH;
         target.element.style.setProperty(
           "--chapter-pan-y",
-          `${(-progress * target.overflowRatio * CHAPTER_PAN_STRENGTH * 100).toFixed(3)}%`,
+          `${(pan * 100).toFixed(3)}%`,
         );
+        const bleed = target.bleed;
+        if (!bleed) continue;
+        // The plate is pinned to the window, so in the chapter's own coordinates the window
+        // begins at the scroll offset.
+        bleed.style.setProperty(
+          "--chapter-window-y",
+          `${((scrollY - target.top) / scale).toFixed(2)}px`,
+        );
+        // Where the window's two edges fall on the frame, and therefore which colours the
+        // strips beyond them have to hold. The pan moves the frame up, so the window opens
+        // that much further down it.
+        const offset = -pan * target.imageHeight;
+        const edgeTop = sampleRamp(target.ramp, offset / target.imageHeight);
+        const edgeBottom = sampleRamp(
+          target.ramp,
+          (offset + viewportHeight) / target.imageHeight,
+        );
+        // A colour write repaints the strip, unlike the transform above, so only a colour
+        // that actually changed is written.
+        if (edgeTop !== target.written[0]) {
+          bleed.style.setProperty("--chapter-edge-top", edgeTop);
+          target.written[0] = edgeTop;
+        }
+        if (edgeBottom !== target.written[1]) {
+          bleed.style.setProperty("--chapter-edge-bottom", edgeBottom);
+          target.written[1] = edgeBottom;
+        }
       }
     }
 

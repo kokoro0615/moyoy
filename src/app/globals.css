@@ -488,10 +488,22 @@ main[data-page="moyoy-lp"] {
 }
 
 /* `--chapter-tone` is the measured mean colour of each approved photograph. It backs the
-   masked window, so an undecoded frame still reads as the chapter — and because that tone
-   is then literally what the window paints, it is also what the browser bars are tinted
-   from until the frame decodes and the scroll owner can read the colour out of the
-   photograph itself. There is no second table of per-bar constants to keep in step. */
+   masked window, so an undecoded frame still reads as the chapter.
+
+   `--chapter-edge-top` and `--chapter-edge-bottom` are what `.chapter-photo-bleed` carries
+   into the strips iOS Safari draws its bars over — see that rule for why nothing else can
+   reach them. The scroll owner writes them each frame, reading the frame's own upper and
+   lower edge out of `chapterRamps` in `src/lib/moyoy-content.ts`; the tone stands in until
+   it does.
+
+   Two measured wrong turns are worth recording, because both look reasonable on paper. A
+   single per-chapter edge colour cut the worst mismatch against the neighbouring
+   photograph from 128 levels to 60 but pushed the already-good positions from 6 to 26: a
+   constant cannot follow a frame that pans. Continuing the photograph past the plate
+   instead — its real colour below its real lower edge — fixed the top but took the bottom
+   from 29 to 63, because every approved strip ends in a near-white tail that the plate
+   clips and the reader never sees. What belongs in a strip is the edge the reader is
+   looking at, held: not a constant, and not the frame's continuation. */
 .chapter-root {
   --chapter-tone: #12281d;
 
@@ -558,6 +570,45 @@ main[data-page="moyoy-lp"] {
   mask-mode: alpha;
   mask-repeat: no-repeat;
   mask-size: 100% 100%;
+}
+
+/* The strips iOS Safari draws its translucent bars over lie outside the window, and a
+   `position: fixed` box is clipped to the window: measured on an iPhone, a plate declaring
+   a 160 px overhang painted no further than one declaring none, and `lvh`, `dvh` and `vh`
+   all equal `innerHeight` there, so no viewport unit reaches past it either. The plate can
+   never cover those strips.
+
+   What the bars are translucent over is the document's own scrolled paint — a striped
+   absolutely positioned band read back through the top bar at hue 173–176° against its own
+   186°, while the fixed plate never appeared in a strip at all: where that band stopped
+   short of the window edge the bar fell back to the page ground at 45°, not to the plate's
+   green at 147°. On this page that document paint was `.chapter-photo`'s flat mean-colour
+   fill, which is the band: one colour, exactly as tall as the bar, laid across the frame.
+
+   This is the layer that answers those strips. It is ordinary document content, so it
+   reaches them. Its content box is the window and paints nothing; the two borders are the
+   strips themselves, and they hold the colour of the frame's own upper and lower edge,
+   which the scroll owner samples out of the chapter's ramp as the frame pans.
+
+   It is a sibling *before* the plate, so inside the window the plate covers it and nothing
+   about the composition changes — it is only ever seen through a browser bar. Every length
+   is zero until the scroll owner measures, so a page without JavaScript is exactly the page
+   that shipped before it. `transform` rather than `top`, so the per-frame offset stays on
+   the compositor and never repaints the masked chapter.
+   See docs/ios26-tint-root-cause.md. */
+.chapter-photo-bleed {
+  position: absolute;
+  top: calc(-1 * var(--chapter-bleed, 0px));
+  right: 0;
+  left: 0;
+  box-sizing: content-box;
+  height: var(--chapter-window, 0px);
+  border-top: var(--chapter-bleed, 0px) solid
+    var(--chapter-edge-top, var(--chapter-tone, var(--ink)));
+  border-bottom: var(--chapter-bleed, 0px) solid
+    var(--chapter-edge-bottom, var(--chapter-tone, var(--ink)));
+  pointer-events: none;
+  transform: translate3d(0, var(--chapter-window-y, 0px), 0);
 }
 
 /* DA-MEDIA-01 「背景写真は固定（スクロールしない）」. A real viewport-fixed plate, the

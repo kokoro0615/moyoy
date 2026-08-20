@@ -154,6 +154,14 @@ export default function MoyoyPage() {
                     pin exactly as the cited reference does and no scroll listener can
                     fall a frame behind it. */}
                 <div className="chapter-photo">
+                  {/* iOS Safari's bars are translucent over the document's own paint, and
+                      the fixed plate below is clipped to the window and cannot reach the
+                      strips they cover. This layer can: it is ordinary document content,
+                      the scroll owner parks it over the window with a bleed on each side,
+                      and it carries the frame's own edge colours so the bars continue the
+                      photograph instead of banding it. The plate covers it everywhere the
+                      reader can actually look. */}
+                  <div aria-hidden="true" className="chapter-photo-bleed" />
                   <div className="chapter-photo-pin">
                     {/* Each source carries its own intrinsic box: the SP and 2560 crops
                         do not share the default aspect ratio, so without them the plate
