@@ -55,6 +55,7 @@ asset existence, build success, or implementation-authored regression snapshots.
 | VF-39 | every viewport, Safari / iOS Safari only | Owner review on a physical iPhone (390 × 844): the page keeps a blank margin at both edges all the way to the end of the document and the composition is broken | both artboards resolve their authored canvas against the window with `zoom`, and the ratio was computed in CSS as `tan(atan2(100vw, 375px))` / `tan(atan2(100vw, 1200px))` — the only construct on the page whose implementations still disagree. `atan2()` over two lengths in **different units** is unspecified (w3c/csswg-drafts#7482) and shipping WebKit does not return the ratio, so `zoom` is invalid at computed-value time and falls back to `1`. The artboard then renders at its authored **375 px** (SP) / **1200 px** (PC) width and the base rule's `margin-inline: auto` centres it: a 7.5 px paper gutter down both edges of a 390 px phone, 27.5 px on a 430 px phone, 120 px on a 1440 px Safari window — and the whole composition 4 %–20 % off the frame it was measured against. The same ratio feeds `--first-view-height` and the scroll controller, so the scroll cue and every parallax offset were wrong with it. Measured on the owner's frame: the wordmark ink ends at 0.691 of the window against the approved 0.7067, i.e. exactly the 375/390 ratio. The ratio is now written as a plain number by a render-blocking head script before the first paint, and the CSS path registers the viewport width as a `<length>` so both `atan2()` arguments arrive in the same unit. Verified in Chromium, Firefox and WebKit at 360/375/390/402/430/639/720/768/1200/1440/2560: artboard left edge 0, artboard width = window width | CORRECTED — 11 WIDTHS × 3 ENGINES; PENDING HUMAN REVIEW ON DEVICE |
 | VF-40 | page top and page end, Safari / iOS Safari only | Owner review on a physical iPhone: a dark green band above the status bar and below the browser toolbar | DA-MEDIA-01 pins each chapter photograph with a real `position: fixed` plate inside a masked silhouette window, and the plate is backed by `--chapter-tone`. WebKit stops applying the ancestor mask to that composited layer once the window scrolls out of view: reproduced in WebKit at 390 × 844 and 1440 × 900, where the ROOT photograph paints across the paper hero — the hero clip reads mean rgb(20, 46, 32) against Chromium's rgb(231, 226, 211). ROOT holds the highest chapter `z-index`, and its tone `#12281d` is the green the owner photographed. With `viewport-fit=cover` the fixed plate also extends into the strips iOS Safari draws its toolbars over, which is where the escape stays visible on the device. The window now carries an explicit `clip-path: inset(0)` — a geometric clip WebKit does apply to the composited layer, and, unlike `transform`, `filter` or `contain: paint`, one that does not become the containing block for a fixed descendant, so the plate stays viewport-fixed (pin rect measured at 0/844 at three scroll positions in both engines, unchanged). The browser UI tint is additionally stated as `theme-color: #ece7d8` instead of being sampled from the page. Measured after: WebKit hero clip rgb(231, 226, 211) at 390, rgb(235, 230, 215) at 1440 — identical to Chromium | CORRECTED — MEASURED IN WEBKIT AND CHROMIUM AT 390 AND 1440; PENDING HUMAN REVIEW ON DEVICE |
 | VF-41 | page top and page end, iOS 26 Safari | Owner review after VF-40 shipped: the left/right gutters are gone, but the top and bottom bands return as soon as the ROOT photograph reaches the window — now the paper colour rather than green | **VF-40's diagnosis was incomplete and its `theme-color` half was inert.** Safari 26 no longer reads `theme-color` at all: it parses the tag and discards the value. It derives the tint of the status bar and the toolbar from the `background-color` of whichever `position: fixed` or `sticky` element is on screen, and falls back to the body. This page carries four full-window `position: fixed` chapter plates backed by `--chapter-tone`, present at every scroll position — which is why the browser painted ROOT's `#12281d` into both bars for the whole document, over the paper page as much as over its own photograph. VF-40's `clip-path` took the plates out of the browser's reckoning, so the tint fell through to the body's `#d8d5cc` and the same bands came back in light grey. Three changes: the undecoded-frame tone moves from the fixed plate onto the absolutely positioned masked window, which Safari never samples and where it is visually identical; the root and body ground becomes the paper the reader actually sees, so the no-JavaScript floor and the overscroll rubber band match the page; and one dedicated fixed layer at `z-index: -1`, invisible behind the opaque canvas, carries the tint, pointed by the scroll owner at the surface the bars are drawn over. The colour is `--chapter-chrome`, the measured mean of the band at the top of each photograph — not the photograph's own mean, which is a different colour wherever the frame opens on sky (DUSK's mean is `#6b442c`; the band under the status bar is `#9288b3`). Swept every 100 px across the whole document in WebKit at 390 × 844: the tint parts from the page under the top bar by ΔE ≤ 25 everywhere except two single-sample seam frames | CORRECTED — FULL-DOCUMENT SWEEP AT 390 × 844; PENDING HUMAN REVIEW ON DEVICE |
+| VF-42 | page top and page end, iOS 26 Safari | **Owner rejection of VF-41.** The bands are still there and still paper-coloured, over every photograph | **VF-41 built the right mechanism and then hid it where the browser cannot see it.** Safari 26 samples the `background-color` of a `position: fixed` or `sticky` element at the window edge — within 4 px of the top or 3 px of the bottom, at least 80 % of the width and at least 3 px high — and falls back to the body when it finds none. `display: none` is the only state that removes an element from that sampling; `opacity: 0`, `visibility: hidden` and `pointer-events: none` are all still read. VF-41 hid its two anchors at `z-index: -1`, under the opaque paper canvas: **an anchor buried below the page is never sampled**, so both bars fell through to the body's `#ece7d8` for the whole document, which is exactly the paper band the owner photographed. The anchors are now `opacity: 0` at `z-index: 120` and 16 px high, which is invisible to the reader and inside every published threshold. Two further defects were found while measuring the fix. **(a) The per-chapter colour table was partly wrong and structurally cannot be right at a wide window.** DUSK's toolbar constant was `#243b2c`, a dark green taken from ROOT, against the `#2c2016` warm brown the DUSK frame actually puts under the bar (Δ 36); and at 1440 × 900 the plate traverses 58 % of its frame while the chapter is on screen, so DUSK's status bar runs from `#e7a133` lit sun to `#2a180f` forest and no constant is both. The table is deleted. The tint is now composited from the artwork itself: each photograph, silhouette mask and the paper foreground is reduced once to a 192-row ramp of mean RGBA in an offscreen canvas, and the bar's own band is painted in z-order — foreground, then chapters by coverage, then the page ground — so a chapter boundary where the silhouette is genuinely part paper reads as part paper instead of turning the bar black over a cream page. Until a frame decodes the answer is `--chapter-tone`, which is what the masked window is painting in the meantime. **(b) A latent measurement bug, present since the controller was written, that put every document band a whole chapter out.** `measure()` added `window.scrollY` to a client rect; WebKit scrolls on its own thread, so a measure raised by an image load during a scroll can read a scroll offset the rects have not caught up with, and the bands then stay wrong because nothing re-measures afterwards. Reproduced: at `scrollY 3800` the status bar took ROOT's `rgb(18, 46, 33)` against DUSK's `rgb(149, 128, 161)` on screen. The offset is now read from the root element's own rect, which is whatever the rects were taken against. This also governed the parallax ranges and the menu control's surface test. Measured after, anchor colour against the page behind each bar, swept across the whole document against the production build in WebKit: **390 × 844 mean 11.2 / worst 44** (was worst 256), **1440 × 900 mean 3.7 / worst 15** (was worst 295), **768 × 1024 mean 7.5 / worst 46** (was worst 254). Every remaining worst case is a chapter boundary. Three consecutive identical sweeps | CORRECTED — FULL-DOCUMENT SWEEPS AT 390 × 844, 768 × 1024 AND 1440 × 900; PENDING HUMAN REVIEW ON DEVICE |
 
 ## Closure evidence
 
@@ -387,3 +388,106 @@ the glass; it can only choose the colour Safari paints, which is what this does.
 | `pnpm test:e2e` (Chromium 151 / Firefox 153 / WebKit 26.5) | PASS — includes the new tint invariant on all three engines |
 | `pnpm test:visual` | PASS — 21 baselines unchanged, so the tint layer is provably invisible |
 | `pnpm test:a11y` | PASS |
+
+## 2026-08-20 fifth owner-review pass — the bands are still paper
+
+The fourth pass built the right mechanism and then hid it where the browser cannot see
+it. Three separate defects were found; only the first is what the owner reported.
+
+### 1. An anchor below the page is never sampled
+
+Safari 26 samples a `position: fixed` or `sticky` element that sits **within 4 px of the
+top or 3 px of the bottom, spans at least 80 % of the width and is at least 3 px high**,
+and falls back to the body when it finds none. Of the ways to hide such an element, only
+`display: none` removes it from that sampling — `opacity: 0`, `visibility: hidden` and
+`pointer-events: none` are all still read, which is why a hidden `opacity: 0` modal
+backdrop tints the toolbar on sites that do not expect it.
+
+The fourth pass hid both anchors at `z-index: -1`, under the opaque paper canvas. That is
+not one of those states: an element painted below the page is not offered to the sampler
+at all, so both bars fell through to the body's `#ece7d8` for the whole document — the
+paper band the owner photographed. The anchors are now `opacity: 0` at `z-index: 120` and
+16 px high, invisible to the reader and inside every published threshold.
+
+| State | Tint the browser read | What the reader saw |
+| --- | --- | --- |
+| Before VF-40 | ROOT plate `#12281d` | green bands over the paper hero |
+| After VF-40 | body `#d8d5cc` | grey bands over the ROOT photograph |
+| After VF-41 | body `#ece7d8` — the anchors were never sampled | paper bands over every photograph |
+| Now | the anchors themselves, composited from the artwork | the bar colour is the page colour |
+
+### 2. A table of per-chapter colours cannot be right at a wide window
+
+DUSK's toolbar constant was `#243b2c`, a dark green taken from ROOT, against the `#2c2016`
+warm brown the DUSK frame actually puts under the bar — Δ 36, a different hue. That one is
+simply an error. The structural problem is larger: at 1440 × 900 the plate traverses 58 %
+of its frame while the chapter is on screen, so DUSK's status bar runs from `#e7a133` lit
+sun to `#2a180f` forest and no constant is both.
+
+The table is deleted. Each photograph, silhouette mask and the paper foreground is reduced
+once to a 192-row ramp of mean RGBA in an offscreen canvas, and the band a bar covers is
+composited in z-order — foreground, then chapters by mask coverage, then the page ground.
+A chapter boundary where the silhouette is genuinely part paper therefore reads as part
+paper, instead of turning the bar black over a cream page. Until a frame decodes the
+answer is `--chapter-tone`, which is exactly what the masked window paints in the meantime,
+so the pre-decode state is correct rather than approximate.
+
+### 3. A latent measurement bug put every document band a whole chapter out
+
+`measure()` added `window.scrollY` to a client rect. WebKit scrolls on its own thread, so a
+measure raised by an image load during a scroll can read a scroll offset the rects have not
+caught up with — and the bands then stay wrong, because nothing re-measures afterwards.
+Reproduced deterministically at 390 × 844: at `scrollY 3800` the status bar took ROOT's
+`rgb(18, 46, 33)` against DUSK's `rgb(149, 128, 161)` on screen. The offset is now read
+from the root element's own rect, which is whatever offset the rects were taken against.
+
+This is older than the tint work and also governed the parallax crossing ranges and the
+menu control's surface test, both of which were silently one chapter out in the same frames.
+
+### Full-document sweeps against the production build, WebKit 26.5
+
+Distance between the anchor colour and the mean of the page under each bar — the top 60 px
+for the status bar, the bottom 90 px for the toolbar — swept across the whole document.
+
+| Viewport | Worst before | Mean after | Worst after |
+| --- | --- | --- | --- |
+| 390 × 844 | 256 | 11.2 | 44 |
+| 1440 × 900 | 295 | 3.7 | 15 |
+| 768 × 1024 | 254 | 7.5 | 46 |
+
+Every remaining worst case is a chapter boundary, where the mask is genuinely blending two
+surfaces. Three consecutive sweeps returned identical figures, so the result is not timing
+dependent.
+
+### Known limitation in the regression suite
+
+`pnpm test:e2e` at its default worker count is not reliable on a 24-core workstation: the
+single `next start` process serving twelve parallel browsers produces `networkidle`
+timeouts in tests unrelated to any change. Confirmed by running the same suite on the
+unmodified baseline, which failed seven tests of the same kind. The suite is run with a
+bounded worker count for the figures below; the flakiness is environmental and is not a
+property of the page.
+
+### Gate status
+
+Run at four workers on an otherwise idle workstation, against the production build.
+
+| Gate | Result |
+| --- | --- |
+| `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | PASS |
+| `pnpm test:unit` | PASS — 3 tests, 100 % statements |
+| `pnpm test:e2e` (Chromium 151 / Firefox 153 / WebKit 26.5) | 110 passed, 1 failed — `every piece of decorative line artwork carries a scroll offset`, which passes 3/3 in isolation and is one of the tests that also fails on the unmodified baseline under parallel load |
+| `pnpm test:visual` | PASS — 21 baselines unchanged, so the tint anchors are provably invisible at `opacity: 0` |
+| `pnpm test:a11y` | PASS |
+| `pnpm test:fidelity`, `pnpm candidate:preflight` | BLOCKED, pre-existing and unchanged |
+
+### One measurement artefact worth recording
+
+The sweep harness originally waited a fixed 320 ms after each scroll before reading the
+anchor. Under load that is not long enough for the frame loop to settle, and the reading
+is then the previous surface — which reads exactly like the stale-band defect above and
+sent two rounds of this investigation after a bug that was in the harness. The harness now
+polls the anchor until it stops changing, the same way the e2e assertion does, and the
+figures are reproducible across runs. A tint that is briefly one surface behind *while the
+document is moving* is the designed behaviour of a frame loop; only a tint that stays
+behind after it stops is a defect.

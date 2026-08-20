@@ -133,17 +133,41 @@ for (const viewport of [
 
 /**
  * Safari 26 no longer reads `theme-color`. It colours its status bar and toolbar from the
- * `background-color` of whichever `position: fixed` element is nearest that edge of the
- * window, falling back to the body — which is why four always-present full-window chapter
- * plates painted one chapter's colour into both bars for the whole document. Two
- * `.chrome-tint` anchors now sit at the two edges, and the scroll owner points each at the
- * surface its own bar is drawn over. The invariant is that each anchor's colour matches
- * the page behind its bar; the check is a pixel read because the defect was a colour, not
- * a layout.
+ * `background-color` of a `position: fixed` element at that edge of the window, falling
+ * back to the body — and only one it can see: the same anchors, hidden at `z-index: -1`
+ * under the opaque paper canvas, were never sampled, so both bars stayed paper-coloured
+ * over every photograph. They are `opacity: 0` now, and the scroll owner composites each
+ * one from the artwork its own bar is drawn over rather than from a per-chapter constant.
+ *
+ * The invariant is that each anchor's colour matches the page behind its bar; the check is
+ * a pixel read because the defect was a colour, not a layout. The bound is the sampled
+ * bands themselves: the swept worst case is 44 at 390 × 844, 15 at 1440 × 900 and 46 at
+ * 768 × 1024, all of them at a chapter boundary where the silhouette is genuinely part
+ * paper, so 60 leaves room for a frame of scroll latency and nothing more.
  */
 test("keeps each browser bar tinted from the surface behind it", async ({ page }) => {
   await page.setViewportSize({ height: 844, width: 390 });
   await page.goto("/", { waitUntil: "networkidle" });
+
+  // The chapter photography is deferred, and an undecoded frame is a different colour
+  // from a decoded one — the masked window paints `--chapter-tone` until it arrives, and
+  // the tint follows it there. Both states are correct, so the sweep below states which
+  // one it is measuring: every frame is armed by one pass to the end of the document and
+  // the assertions do not start until all four have decoded.
+  const documentHeight = await page.evaluate(
+    () => document.documentElement.scrollHeight,
+  );
+  for (let armed = 0; armed <= documentHeight; armed += 800) {
+    // Stepped, not jumped: the production preloader arms a chapter from an intersection
+    // observer, so a chapter the page never passes through is never asked to load.
+    await page.evaluate((y) => window.scrollTo(0, y), armed);
+    await page.waitForTimeout(60);
+  }
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll<HTMLImageElement>(".chapter-photo-pin img")].every(
+      (image) => image.complete && image.naturalWidth > 0,
+    ),
+  );
 
   // Two samples inside each surface the page presents, clear of the seams: the chapter
   // silhouettes blend two photographs there, so no single colour is the right answer and
@@ -176,7 +200,16 @@ test("keeps each browser bar tinted from the surface behind it", async ({ page }
       const layers = [...document.querySelectorAll(".chrome-tint")];
       if (layers.length !== 2) throw new Error("both chrome tint anchors are required");
       return layers.map((layer) => {
-        const parts = getComputedStyle(layer).backgroundColor.match(/[\d.]+/g);
+        const style = getComputedStyle(layer);
+        // The three properties Safari's sampling depends on. `z-index: -1` is what broke
+        // it, and an anchor that starts painting is a visible band on the page.
+        if (style.position !== "fixed")
+          throw new Error("an anchor is not viewport-fixed");
+        if (Number(style.zIndex) < 0)
+          throw new Error("an anchor is painted below the page");
+        if (style.opacity !== "0")
+          throw new Error("an anchor is visible to the reader");
+        const parts = style.backgroundColor.match(/[\d.]+/g);
         if (!parts) throw new Error("a chrome tint anchor has no colour");
         return parts.slice(0, 3).map(Number);
       });

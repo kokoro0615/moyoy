@@ -551,3 +551,20 @@ whenever an answer changes architecture, content, rights, or acceptance.
   session that claimed to have re-recorded all 21, because the flag does not force every
   file to be rewritten. The script now passes `--update-snapshots=all`, and a baseline's
   timestamp is now treated as evidence in its own right.
+- Stopped describing a surface and started reading it. The browser-bar tint went through
+  three rounds of "measure the photograph, write the colour into CSS", and each round was
+  wrong in a new way: a mean that ignored where the bar actually sits, a value copied from
+  the wrong chapter, and finally a constant asked to describe a plate that travels 58 % of
+  its own frame. The page now reduces each photograph, mask and paper foreground to a
+  colour ramp at runtime and composites the exact band a bar covers. No table to keep in
+  step with the assets, and the chapter seams — where the silhouette is genuinely half
+  paper — come out as half paper instead of snapping to one surface.
+- Learned that "invisible" and "not sampled" are different states, and that Safari
+  distinguishes them the opposite way to intuition. An `opacity: 0` element is read for
+  the browser UI tint; an element painted below the page at `z-index: -1` is not. The
+  tint anchors were hidden the wrong way for two sessions and the fix looked inert on the
+  device while measuring perfectly under test, because nothing under test reads the tint.
+- Never add `window.scrollY` to a client rect. WebKit scrolls on a separate thread, so the
+  two can disagree for a frame, and a cache built in that frame stays wrong forever. The
+  document offset is now taken from the root element's own rect, which is by definition
+  the offset the other rects were measured against.

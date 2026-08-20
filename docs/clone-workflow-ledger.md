@@ -306,3 +306,47 @@ to the body colour rather than removing the band.
 | Transparent bars | not available to a page: the glass appears only when Safari finds no colour at all, and the body background is always a fallback. A WebKit fix is reported as expected in iOS 26.2 |
 | WebKit / mobile-context visual baselines | still absent |
 | `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
+
+## 2026-08-20 fifth session — the bands were still paper
+
+- **Mode:** unchanged (authorized client rebuild; existing-product defect fix).
+- **Production owner:** unchanged — the main conversation.
+- **In scope:** one owner-reported defect (VF-42) — the fourth session's fix did not
+  change what the device shows. The bands are still there and still paper-coloured.
+- **Out of scope, unchanged:** everything recorded in the previous four sessions.
+
+### Reference and rights
+
+No new target site was visited and no asset was downloaded. No production asset changed.
+The per-chapter tint table introduced last session was **deleted**, not re-measured: the
+tint is now read at runtime from the shipped photographs and masks already in the
+repository. External research was limited to public documentation of Safari 26's sampling
+rules, which is recorded in `docs/visual-fidelity-defects.md`.
+
+### Root cause
+
+Three defects, only the first of which the owner could see:
+
+1. The two tint anchors were hidden at `z-index: -1`, under the opaque paper canvas.
+   Safari only samples an element that is offered to it; `display: none` is the sole
+   hiding state that removes one, and painting below the page is not a hiding state at
+   all — it removes the element from the sampler entirely. Both bars therefore fell back
+   to the body's paper. The anchors are `opacity: 0` now, which is invisible and sampled.
+2. The per-chapter colour table had DUSK's toolbar value taken from ROOT, and could not be
+   correct at a wide window in any case, because the plate traverses 58 % of its frame
+   while the chapter is on screen.
+3. `measure()` mixed `window.scrollY` with client rects. Under WebKit's threaded scrolling
+   a measure raised mid-scroll could cache every document band a whole chapter out — a
+   latent bug older than the tint work, which also governed the parallax ranges and the
+   menu control's surface test.
+
+### Still unresolved after this session
+
+| Item | State |
+| --- | --- |
+| VF-42 on the owner's device | corrected and swept at three viewports in WebKit under Playwright, which is not iOS Safari; **a device re-check is required to close it** |
+| Chapter-seam frames | the remaining worst cases (Δ 44 / 46) are the boundaries where the silhouette genuinely blends photograph and paper. The composite now tracks that blend rather than snapping to one surface, so the bar is wrong by a few levels rather than by a whole surface |
+| Transparent bars | unchanged: not available to a page. A WebKit fix is reported as expected in iOS 26.2 |
+| `pnpm test:e2e` at default parallelism | **environmentally unreliable on this workstation** — `networkidle` timeouts in unrelated tests, reproduced on the unmodified baseline (7 failures). Runs are bounded to 2–4 workers |
+| WebKit / mobile-context visual baselines | still absent |
+| `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
