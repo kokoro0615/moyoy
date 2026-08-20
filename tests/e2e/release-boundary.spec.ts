@@ -258,3 +258,94 @@ test("offers Safari no colour for either browser bar", async ({ page }) => {
     }
   }
 });
+
+/**
+ * The other half of the same problem, and the one the check above cannot see.
+ *
+ * `fixedContainerEdges()` decides what *colour* the browser bars take. It does not decide
+ * what the page paints behind them, and on iOS those are different regions: the containing
+ * block for `position: fixed` is the layout viewport, which Safari shrinks by the obscured
+ * inset its bottom toolbar occupies, while the document keeps painting under the toolbar and
+ * the toolbar is translucent. A plate at `inset: 0` therefore stops one toolbar height short
+ * of the window, and what shows through the bar is whatever is behind the plate —
+ * `.chapter-photo`'s flat undecoded-frame fill, a band of `--chapter-tone` as tall as the
+ * toolbar. Emulated in WebKit at 390 × 902 with an 844 px layout viewport, that band filled
+ * all 58 rows of the strip in every chapter; sizing the plate to `lvh` instead reduced it to
+ * at most 3.
+ *
+ * Playwright has no browser UI, so no obscured inset exists here and the plate is exactly
+ * window-sized — the same box the visual baselines were taken against. What this asserts is
+ * the two properties that keep the photograph at the window edge once an inset does appear:
+ * the plate is never shorter than the window, and the frame inside it never pans clear of
+ * its bottom edge. See docs/ios26-tint-root-cause.md §10.
+ */
+test("runs the photograph to the window edge rather than a flat fill", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { height: 900, label: "1440x900", width: 1440 },
+    { height: 1024, label: "768x1024", width: 768 },
+    { height: 844, label: "390x844", width: 390 },
+  ]) {
+    await page.setViewportSize({ height: viewport.height, width: viewport.width });
+    await page.goto("/", { waitUntil: "networkidle" });
+
+    // `.chapter-photo` is an ancestor of whatever answers a bottom-edge hit test, and
+    // `primaryBackgroundColorForRenderer()` reads `style().backgroundColor()` off every box
+    // in that lineage — it never asks the box to be fixed. A declared colour there is a
+    // legal source for the bar fill, so the fallback is a gradient instead.
+    const fill = await page.evaluate(() => {
+      const photo = document.querySelector(".chapter-photo");
+      const style = photo ? getComputedStyle(photo) : null;
+      return {
+        color: style?.backgroundColor ?? "",
+        image: style?.backgroundImage ?? "",
+      };
+    });
+    expect(fill.color, `${viewport.label}: chapter fill declares no colour`).toBe(
+      "rgba(0, 0, 0, 0)",
+    );
+    expect(fill.image, `${viewport.label}: chapter fill is still painted`).toContain(
+      "gradient",
+    );
+
+    for (const offset of [2800, 3200, 3800, 4200, 4600, 5000]) {
+      await page.evaluate((y) => window.scrollTo(0, y), offset);
+      await page.waitForTimeout(120);
+
+      const plates = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>(".chapter-photo-pin")]
+          .map((pin) => {
+            const frame = pin.querySelector("img");
+            if (!frame) return null;
+            const plate = pin.getBoundingClientRect();
+            // Both rects come from inside the zoomed artboard, so they share its units.
+            return {
+              chapter:
+                pin.closest<HTMLElement>("[data-chapter]")?.dataset.chapter ?? "",
+              coversWindow: plate.bottom >= window.innerHeight - 0.5,
+              frameOvershoot: frame.getBoundingClientRect().bottom - plate.bottom,
+            };
+          })
+          .filter((entry) => entry !== null),
+      );
+
+      expect(plates.length, `${viewport.label}: every chapter has a plate`).toBe(4);
+      for (const plate of plates) {
+        const where = `${viewport.label} ${plate.chapter} at scrollY ${offset}`;
+        expect(plate.coversWindow, `${where}: plate reaches the window edge`).toBe(
+          true,
+        );
+        // At full pan the travel consumes the hidden remainder exactly, so the frame
+        // lands *on* the plate's bottom edge and layout rounding decides the last
+        // fraction of a pixel: measured worst case -0.078 px across the three engines.
+        // The tolerance is that rounding and nothing more — a frame genuinely short of
+        // the edge uncovers the flat fill in whole pixels.
+        expect(
+          plate.frameOvershoot,
+          `${where}: frame still covers the plate's bottom edge`,
+        ).toBeGreaterThan(-0.5);
+      }
+    }
+  }
+});

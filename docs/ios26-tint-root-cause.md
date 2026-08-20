@@ -415,3 +415,155 @@ Device checks:
     [300965](https://bugs.webkit.org/show_bug.cgi?id=300965)) — resolved in 26.2, but the fix
     is about structural dialog/backdrop open-close. It must **not** be read as "arbitrary
     dynamic background colours now re-sample".
+
+---
+
+## 10. The band that was left: the bottom edge, and why it was never a tint
+
+Reported against `4d74b4b`, with the shields deployed: **the top bar is translucent and the
+bottom bar still carries a band of colour, in every photographic chapter, clearing again on
+the paper page.**
+
+§1–§9 answer "what colour does Safari fill the bar with". That was the wrong question for
+this band. The band is not a fill. It is the page.
+
+### 10.1 What the device screenshots measure
+
+Four device captures (iOS 26.6.1, iPhone at 1206 device px wide) were sampled column by
+column, against the declared `--chapter-tone` of the chapter on screen and against the
+photograph's own pixels immediately above the band:
+
+| capture | band | `--chapter-tone` | Δ | photo pixels just above | Δ |
+| --- | --- | --- | --- | --- | --- |
+| ROOT | `#17271d` | `#12281d` | 5 | `#131b17` | 13 |
+| DUSK | `#654631` | `#6b442c` | 6 | `#593723` | 18 |
+| DAWN | `#496242` | `#42633e` | 7 | `#24331e` | 48 |
+| ALPINE | `#7f9ea3` | `#779fa4` | 8 | `#98b3b5` | 33 |
+
+The band is the **declared** tone (Δ ≤ 8, which is screenshot and bar-material noise), not
+the rendered edge. DAWN's band is far lighter than the dark trees above it and ALPINE's is
+far darker than the snow, so it is not `PageColorSampler` reading the last rows of the
+photograph either. The band is 172–174 device px in all four — **58 CSS px, one Safari
+bottom toolbar** — and the page content stops exactly at its top edge.
+
+### 10.2 The mechanism
+
+On iOS the containing block for `position: fixed` is the layout viewport, and Safari
+shrinks that by the obscured inset its bottom toolbar occupies. The document is not
+shrunk: it keeps painting under the toolbar, and in iOS 26 the toolbar is translucent.
+
+`.chapter-photo-pin` is `position: fixed; inset: 0` with `overflow: clip`, so it stops at
+the toolbar's top edge and clips the photograph there. Everything below is painted by its
+parent `.chapter-photo`, which carried `background: var(--chapter-tone)` as its
+undecoded-frame fallback. **A flat rectangle of chapter tone, exactly one toolbar tall,
+seen through a translucent bar, is indistinguishable from an opaquely tinted bar.**
+
+Top and bottom differ because the two insets differ. In iOS 26 Safari the address bar is at
+the bottom, so `obscuredInsets.bottom() > 0` and `obscuredInsets.top()` is not — the status
+bar is a safe-area inset with `viewport-fit=cover`, which the page is laid out *under*. The
+plate reaches the top of the window and the photograph runs behind the status bar. It never
+reaches the bottom.
+
+That asymmetry also means `sidesRequiringFixedContainerEdges()` (§7) does not add
+`BoxSide::Top` at all on this configuration, so the top bar's translucency is not evidence
+that `.chrome-shield` works. The shields are retained — the plate is still a candidate at
+the bottom and they still take that hit — but they were never the thing standing between
+this page and this band.
+
+### 10.3 Reproduced and measured, not inferred
+
+WebKit under Playwright at 390 × 902 with an 844 px layout viewport supplied by hand
+(`.chapter-photo-pin { height: calc(844px / var(--mobile-scale)) }`), sweeping every 100 px
+of scroll through all four chapters, counting rows of the 58 px obscured strip that are a
+flat `--chapter-tone` band across 2–98 % of the width:
+
+| chapter | plate at the layout viewport bottom | plate sized to `lvh` |
+| --- | --- | --- |
+| ROOT | **58 / 58** | 0 |
+| DUSK | **58 / 58** | 1 |
+| DAWN | **58 / 58** | 0 |
+| ALPINE | **58 / 58** | 3 |
+
+The unemulated render at 390 × 844 has no flat tone in its last 20 rows at any of those
+offsets, so the ≤ 3 px ALPINE residue appears only under emulation and is most likely an
+artefact of forcing the plate height against `min-height: 100%`. It is not explained, and
+it is recorded here rather than claimed away.
+
+### 10.4 The change
+
+1. **`.chapter-photo-pin` is sized to the window, not to the layout viewport.**
+   `height: max(100%, var(--window-height))`, where `--window-height` is
+   `calc(100lvh / var(--desktop-scale))` — `lvh` because it is the viewport with
+   retractable UI *retracted*, i.e. the whole window, and divided by the artboard scale for
+   the same reason `--first-view-height` is: viewport units ignore `zoom`. `max()` holds
+   every engine without retractable browser UI at exactly the height `bottom: 0` gives, so
+   the plate is pixel-identical off iOS — verified as `Δbottom 0` on WebKit, Chromium and
+   Firefox at 1440 × 900, 1200 × 800, 768 × 1024, 390 × 844 and 360 × 844, and by all 21
+   visual baselines passing unchanged.
+
+2. **The pan range is measured against the plate, not the window.** `overflowRatio` used
+   `window.innerHeight`; once the plate is taller than the layout viewport that overstates
+   the hidden remainder and pans the frame clear of the plate's bottom edge — reopening the
+   gap. It now measures the plate's own box. At full pan the frame lands *on* that edge and
+   layout rounding decides the last fraction of a pixel (worst measured: −0.078 px). A
+   safety margin was tried and reverted: it moved the ALPINE residue 4 px → 3 px, which does
+   not justify perturbing approved DA-MEDIA-01 motion.
+
+3. **The undecoded-frame fallback is a gradient, not a `background-color`.** Defence in
+   depth for the sampler path, at zero visual cost: `primaryBackgroundColorForRenderer()`
+   reads `style().backgroundColor()` off **every** box in the lineage of whatever answered
+   an edge hit test — only `containerEdgeCandidateResult()` requires fixed positioning — so
+   an absolutely positioned ancestor with a declared colour is a legal colour source.
+   `linear-gradient(tone, tone)` is a `background-image`: it still satisfies
+   `isHiddenOrNearlyTransparent()`'s `hasBackground()`, so the box is classified by size
+   rather than as transparent, and there is no colour to take. Two identical stops render
+   as a flat fill.
+
+   This is also why the brief's proposal to move the fallback onto the `<img>` was not
+   taken: the `<img>` is the box the bottom hit test lands on, so a declared colour there is
+   harvested and returned with `.chapter-photo-pin`'s `IsViewportSizedCandidate` — handing
+   Safari the exact tone the shields exist to withhold.
+
+### 10.5 `theme-color`: evaluated, kept
+
+`WebPage::willCommitMainFrameData` carries `page->themeColor()` to the UI process in the
+same payload as `fixedContainerEdges`, but nothing in `LocalFrameView::fixedContainerEdges`
+or `Page::updateFixedContainerEdges` reads it — grep both files: the only `themeColor` in
+`Page.cpp` is the accessor. The two are independent channels, so removing the meta cannot
+change the iOS 26 bar fill in either direction, while it would drop Chrome, Android and
+iOS < 26 from the paper tint to a UA default. `themeColor: paperTint` stays in
+`src/app/layout.tsx`.
+
+### 10.6 Answers to the four questions the brief put to the source
+
+- **(a) Zero candidates — cleared or carried?** **Carried.** `Page::updateFixedContainerEdges`
+  ends with a loop that, for any side without a fixed edge, restores
+  `m_fixedContainerEdgesAndElements.second.at(side)` and its colour, skipping only if that
+  element has lost its renderer or its visibility. A side that once had a colour keeps it,
+  and the carry-forward re-arms itself every commit. **`.chrome-shield` is a "do not add"
+  device, never a "remove" one** — nothing a page can do releases an edge it has already
+  claimed. Recorded because it bounds what any future shield-style fix can achieve.
+- **(b) A separate route for the bottom?** No. `pageExtendedBackgroundColor` appears only
+  inside `fixedContainerEdges` (the `::backdrop` fallback and the alpha blend), and
+  `sampledPageTopColor` is committed independently and is top-only. The bottom band was not
+  a WebKit route at all.
+- **(c) Does the lineage walk accept an absolute ancestor as a colour source?** **Yes** — see
+  §10.4 item 3. The fixed/sticky requirement lives in `containerEdgeCandidateResult()`, not
+  in `primaryBackgroundColorForRenderer()`, and the walk harvests colour *before* it
+  consults the classification.
+- **(d) When does the bottom sample point diverge from CSS `bottom: 0`?** Whenever
+  `obscuredInsets.bottom() > 0` — every iOS 26 Safari tab with the bottom address bar. The
+  divergence is the toolbar height, and the shields' ±100 px straddle already covers it;
+  what it does not cover is that the *page* stops there too, which is §10.2.
+
+### 10.7 What is still unverified
+
+Everything above is measured — on the device screenshots, or in WebKit with the inset
+emulated. **None of it has been re-checked on the device.** Specifically unverified:
+
+- That iOS 26 resolves `100lvh` to the full window rather than to the unobscured area. If it
+  does not, the plate is unchanged and the band remains.
+- Whether the residual band would be page paint or a native fill, since both produce the
+  same colour here; the fix addresses the strip itself, so it closes either.
+- The ≤ 3 px ALPINE residue of §10.3.
+- Landscape, iPad, and the menu-open state of §9, all unchanged by this work.

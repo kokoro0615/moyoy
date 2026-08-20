@@ -350,3 +350,71 @@ Three defects, only the first of which the owner could see:
 | `pnpm test:e2e` at default parallelism | **environmentally unreliable on this workstation** — `networkidle` timeouts in unrelated tests, reproduced on the unmodified baseline (7 failures). Runs are bounded to 2–4 workers |
 | WebKit / mobile-context visual baselines | still absent |
 | `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
+
+## 2026-08-20 seventh session — the bottom band was the page, not the tint
+
+- **Mode:** unchanged (authorized client rebuild; existing-product defect fix).
+- **Production owner:** unchanged — the main conversation. No delegation; the UI/UX
+  exception in `CLAUDE.md` applies.
+- **In scope:** one owner-reported defect — with the `4d74b4b` shields deployed, the top bar
+  is translucent on iOS 26.6.1 and the bottom bar still carries a band of chapter colour
+  inside every photographic chapter, clearing on the paper page.
+- **Out of scope, unchanged:** everything recorded in the previous six sessions.
+
+### Reference and rights
+
+No target site was visited and no asset was downloaded. No production asset changed. All
+external reading was of the shipping WebKit tree at
+`https://github.com/WebKit/WebKit` (`main`): `Source/WebCore/page/LocalFrameView.cpp`,
+`Source/WebCore/page/Page.cpp`, `Source/WebKit/WebProcess/WebPage/Cocoa/WebPageCocoa.mm`.
+
+### Root cause
+
+The band was never a browser-bar tint. On iOS the containing block for `position: fixed` is
+the layout viewport, which Safari shrinks by the bottom toolbar's obscured inset; the
+document keeps painting under the toolbar, and the toolbar is translucent. The fixed
+chapter plate stopped at the toolbar's top edge and clipped the photograph there, so the
+58 CSS px behind the bar was painted by `.chapter-photo`'s flat `--chapter-tone`
+undecoded-frame fallback. The top edge is unaffected because the status bar is a safe-area
+inset under `viewport-fit=cover`, not an obscured one — which also means the top bar's
+translucency was never evidence that the shields work.
+
+Full derivation, measurements and the four source questions answered in
+`docs/ios26-tint-root-cause.md` §10.
+
+### Changes
+
+| File | Change |
+| --- | --- |
+| `src/app/globals.css` | `--window-height` declared beside `--first-view-height` (desktop and ≤ 639 px); `.chapter-photo-pin` sized `max(100%, var(--window-height))` instead of `inset: 0`; reduced-motion override resets `height`; `.chapter-photo`'s fallback becomes `linear-gradient(tone, tone)` with `background-color: transparent` |
+| `src/components/page-motion.tsx` | `overflowRatio` measured against the plate's own box instead of `window.innerHeight` |
+| `tests/e2e/release-boundary.spec.ts` | new test: the plate reaches the window edge, the frame never pans clear of its bottom edge, and `.chapter-photo` declares no `background-color` |
+| `docs/ios26-tint-root-cause.md` | §10 |
+
+`src/app/layout.tsx` is unchanged: `themeColor: paperTint` was evaluated for removal and
+kept — see `docs/ios26-tint-root-cause.md` §10.5.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Inset emulation, WebKit 390 × 902 / 844 px layout viewport, every 100 px of scroll through four chapters | flat-tone band rows in the 58 px obscured strip: **58/58 before → 0–3 after** |
+| Plate bottom vs window bottom, WebKit + Chromium + Firefox at 1440 × 900, 1200 × 800, 768 × 1024, 390 × 844, 360 × 844 | `Δbottom 0` everywhere — pixel-identical to `inset: 0` |
+| `pnpm test:visual` (21 baselines, `ceb7ae5` frames) | pass |
+| `pnpm test:e2e` (chromium / firefox / webkit) | 111 passed, 18 skipped — then 66 passed including the new test |
+| `pnpm test:a11y` | 5 passed, 4 skipped |
+| `pnpm test:unit` | pass, 100 % statements |
+| `pnpm format:check` / `pnpm lint` / `pnpm typecheck` / `pnpm build` | pass |
+
+### Still unresolved after this session
+
+| Item | State |
+| --- | --- |
+| The bottom band on the owner's device | reproduced and closed under emulation in WebKit under Playwright, which is not iOS Safari; **a device re-check is required to close it** |
+| `100lvh` on iOS 26 | **unverified.** The fix assumes `lvh` resolves to the full window rather than the unobscured area. If it does not, the plate is unchanged and the band remains |
+| ≤ 3 px ALPINE residue under emulation | unexplained; absent from the unemulated render, so probably an artefact of forcing the plate height against `min-height: 100%` |
+| Edge colour, once claimed, is never released | confirmed from source: `Page::updateFixedContainerEdges` carries the previous element and colour forward for any side with no candidate. No page-level device can clear an edge it has already claimed |
+| Landscape / iPad / menu-open | unchanged from the previous session's §9 limitations |
+| `pnpm test:e2e` at default parallelism | unchanged: environmentally unreliable on this workstation |
+| WebKit / mobile-context visual baselines | still absent |
+| `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
