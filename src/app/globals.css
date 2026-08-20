@@ -1122,10 +1122,21 @@ footer[data-fidelity="footer"] {
 }
 
 /* The PC reference sets the word beside the mark, so it is anchored to the visual box's
-   left edge, which is the word's own ink edge. `nowrap` and a fixed text size are the two
-   guards the SP rule below depends on and which cost nothing here: the containing block is
-   only as wide as the word, so any substituted face that renders wider than the approved
-   one would otherwise wrap the word onto a second line. */
+   left edge, which is the word's own ink edge.
+
+   `white-space: nowrap` is the guard the SP rule below depends on and it costs nothing
+   here: the containing block is only as wide as the word, so any face that renders wider
+   than the approved one would otherwise wrap it onto a second line, which is the shape the
+   owner reported. It is the load-bearing one — it holds whatever the text ends up
+   measuring, and it is verified on the built page (computed `nowrap` in WebKit).
+
+   `text-size-adjust` is belt-and-braces against iOS inflating the word instead, and it is
+   deliberately NOT relied on: Lightning CSS rewrites the authored `-webkit-` form to
+   `-moz-` plus unprefixed for the configured targets, and whether the unprefixed property
+   reaches iOS Safari cannot be established here — the Linux WebKit build implements
+   neither form, so `CSS.supports()` answers false for both. What does hold on iOS either
+   way is Tailwind preflight's inherited `-webkit-text-size-adjust: 100%` on `html`, which
+   is the canonical way that inflation is disabled. */
 .menu-word {
   position: absolute;
   top: 7.7px;
