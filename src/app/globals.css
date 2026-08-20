@@ -620,7 +620,14 @@ main[data-page="moyoy-lp"] {
      window (320 px) that `Smaller` is not a close call on either axis. */
   left: calc(50% - 12px);
   width: 24px;
-  height: 24px;
+  /* Straddling the edge by 100 px in each direction rather than sitting flush against it.
+     The sampled point is 4 px inside `rectForFixedPositionLayout()`, and on iOS that rect
+     is supplied by the UI process and need not coincide with where CSS `bottom: 0` lands:
+     the toolbar's obscured inset moves as the bar collapses, and the page is laid out above
+     it. A 24 px box flush to the edge assumes the two agree; this one does not need them to.
+     There is room for it — `TooSmall` only asks that the box be under 90 % of the window on
+     both axes, and 200 px clears that even in landscape on the shortest supported phone. */
+  height: 200px;
   /* Present so the box is classified by size rather than as hidden — see above. */
   background-color: var(--paper);
   opacity: 1;
@@ -632,11 +639,11 @@ main[data-page="moyoy-lp"] {
 }
 
 .chrome-shield[data-edge="top"] {
-  top: 0;
+  top: -100px;
 }
 
 .chrome-shield[data-edge="bottom"] {
-  bottom: 0;
+  bottom: -100px;
 }
 
 .chapter-photo-pin picture {

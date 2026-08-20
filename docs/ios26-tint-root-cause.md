@@ -306,7 +306,7 @@ Every value is doing work:
 
 | property | why |
 |---|---|
-| `24px` square | `compareWithViewportSize()` returns `Smaller` below 90 % of the window on a side. `Smaller` on both axes is `TooSmall` — rejected. 24 px clears that by a wide margin even at the 320 px minimum width. |
+| `24px` wide, `200px` tall, straddling the edge by 100 px | `compareWithViewportSize()` returns `Smaller` below 90 % of the window on a side, and `Smaller` on both axes is `TooSmall` — rejected. 200 px clears that even in landscape on the shortest supported phone. The height and the overhang are deliberate: the sampled point is 4 px inside `rectForFixedPositionLayout()`, and on iOS that rect comes from the UI process and need not coincide with where CSS `bottom: 0` lands — the toolbar's obscured inset moves as the bar collapses, and the page is laid out above it. A box flush to the edge assumes the two agree. |
 | `background-color` | **Load-bearing.** Without a background the box is `IsHiddenOrTransparent`, which *does* set `retryHonoringPointerEvents`; the retry honours `pointer-events: none`, steps over the shield, and finds the plate. `TooSmall` is one of the three results that set no retry flag. The colour itself is never read — `primaryBackgroundColorForRenderer()` returns nothing once the box is `Smaller` — so it is the paper only so that anything which ever defeats the mask shows the page's own ground. |
 | `left: calc(50% - 12px)` | The sample point is the midpoint of the edge, inset `sampleRectMargin = 4`. |
 | `z-index: 120` | The shield must be the box the hit test lands on, above the plate. |

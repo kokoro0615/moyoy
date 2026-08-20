@@ -218,6 +218,13 @@ test("offers Safari no colour for either browser bar", async ({ page }) => {
           coversPoint: Boolean(
             box && box.left <= x && box.right >= x && box.top <= y && box.bottom >= y,
           ),
+          // The sampled point is 4 px inside a rect the iOS UI process supplies, which
+          // need not be where CSS `bottom: 0` lands. The shield straddles the edge so it
+          // does not have to be.
+          overhangsEdge:
+            edge === "top"
+              ? Boolean(box && box.top <= -50)
+              : Boolean(box && box.bottom >= window.innerHeight + 50),
           position: style?.position ?? "",
           smallerOnBothAxes: Boolean(
             box &&
@@ -234,6 +241,9 @@ test("offers Safari no colour for either browser bar", async ({ page }) => {
       const where = `${edge} edge at scrollY ${offset}`;
       expect(state.position, `${where}: shield is viewport-fixed`).toBe("fixed");
       expect(state.coversPoint, `${where}: shield covers the sampled point`).toBe(true);
+      expect(state.overhangsEdge, `${where}: shield straddles the window edge`).toBe(
+        true,
+      );
       expect(state.takesTheHit, `${where}: shield takes the edge hit`).toBe(true);
       // Without a background the shield is `IsHiddenOrTransparent`, which sets
       // `retryHonoringPointerEvents` — and that retry steps over it to the plate.
