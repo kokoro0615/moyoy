@@ -160,12 +160,6 @@ img {
      real fold instead of the authored one. Viewport units ignore `zoom`, so the divide
      converts them into the artboard's own coordinate system. */
   --first-view-height: calc(100dvh / var(--desktop-scale));
-  /* The window at its full extent, in artboard units. `lvh` is the viewport with any
-     retractable browser UI retracted, so unlike `dvh` it does not shrink when iOS
-     Safari's toolbar expands — which is exactly the difference `.chapter-photo-pin`
-     needs to reach the real window edge. Declared here, outside the zoomed artboard,
-     for the same reason `--first-view-height` is: viewport units ignore `zoom`. */
-  --window-height: calc(100lvh / var(--desktop-scale));
 }
 
 .page-canvas {
@@ -548,25 +542,14 @@ main[data-page="moyoy-lp"] {
      not become the containing block for a fixed descendant, so the pin below stays
      viewport-fixed. Verified in WebKit and Chromium at 390 and 1440. */
   clip-path: inset(0);
-  /* The undecoded-frame fallback lives here, on the absolutely positioned window rather
-     than on the fixed plate inside it: the mask confines both to the silhouette, so the
-     two are visually the same, and all four plates are present at every scroll position.
-
-     It is declared as a flat gradient rather than as a `background-color`, and that is
-     the point. `primaryBackgroundColorForRenderer()` in LocalFrameView.cpp reads
-     `style().backgroundColor()` off *every* box in the lineage of whatever answered an
-     edge hit test — it never asks that the box be fixed, only `containerEdgeCandidateResult()`
-     does — so an absolutely positioned ancestor with a declared colour is a legal source
-     for the browser-bar fill. A gradient is a `background-image`: it still satisfies
-     `isHiddenOrNearlyTransparent()`'s `hasBackground()`, so the box is still classified
-     by size rather than as transparent, but there is no colour for the sampler to take.
-     Two identical stops render as a flat fill, so nothing about the page changes.
-     See docs/ios26-tint-root-cause.md §10. */
-  background-color: transparent;
-  background-image: linear-gradient(
-    var(--chapter-tone, var(--ink)),
-    var(--chapter-tone, var(--ink))
-  );
+  /* The undecoded-frame fallback lives here, on an absolutely positioned box, rather
+     than on the fixed plate inside. Visually the two are the same — the mask confines
+     both to the silhouette — but Safari 26 derives its toolbar tint from the
+     `background-color` of `position: fixed` elements near the window edges and never
+     from an absolutely positioned one, and all four plates are present at every scroll
+     position. With the tone on the plate the browser painted one chapter's colour into
+     the status bar and toolbar for the whole document, including over the paper page. */
+  background: var(--chapter-tone, var(--ink));
   -webkit-mask-position: center top;
   mask-position: center top;
   -webkit-mask-repeat: no-repeat;
@@ -581,29 +564,10 @@ main[data-page="moyoy-lp"] {
    same technique the cited reference uses. The masked parent above is the window that
    travels; this plate never moves, so the pin is compositor-owned and cannot judder.
    The tone behind it is the photograph's own mean colour, so a frame that has not
-   decoded yet still reads as the chapter instead of as a hole.
-
-   `bottom: 0` is not the bottom of the window. On iOS the containing block for `fixed`
-   is the layout viewport, and Safari shrinks that by the obscured inset its bottom
-   toolbar occupies — while the document behind the toolbar keeps painting, and the
-   toolbar is translucent. A plate that stops at `bottom: 0` therefore ends one toolbar
-   height short of the window, and what shows through the bar is whatever is behind the
-   plate: `.chapter-photo`'s flat undecoded-frame fill, a band of `--chapter-tone`
-   exactly as tall as the toolbar. Measured on WebKit with the inset emulated, sweeping
-   every 100 px of scroll through all four chapters: all 58 rows of that strip were a flat
-   band of the declared tone, and none of them are once the plate is sized below.
-
-   `--window-height` is `lvh` — the viewport with retractable UI retracted, i.e. the whole
-   window — carried into artboard units, so a plate sized to it reaches the real edge and
-   the photograph runs under the bar. `max()` holds every engine without retractable
-   browser UI, and iOS once the bar has retracted, at exactly the height `bottom: 0`
-   gives, so no other viewport changes. See docs/ios26-tint-root-cause.md §10. */
+   decoded yet still reads as the chapter instead of as a hole. */
 .chapter-photo-pin {
   position: fixed;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: max(100%, var(--window-height));
+  inset: 0;
   overflow: clip;
 }
 
@@ -1450,7 +1414,6 @@ footer[data-fidelity="footer"] {
     --sp-source-scale: calc(375 / 751);
     --mobile-scale: var(--sp-canvas-scale);
     --first-view-height: calc(100dvh / var(--mobile-scale));
-    --window-height: calc(100lvh / var(--mobile-scale));
   }
 
   .page-canvas {
@@ -1827,13 +1790,10 @@ footer[data-fidelity="footer"] {
   }
 
   /* Releasing the pin returns each chapter to ordinary static flow, and the photograph
-     fills its own chapter box again so the whole approved frame stays visible. The
-     window-edge height goes with it: an in-flow plate is bounded by its own chapter, not
-     by the browser UI. */
+     fills its own chapter box again so the whole approved frame stays visible. */
   .chapter-photo-pin {
     position: absolute;
     inset: 0;
-    height: auto;
     overflow: clip;
   }
 

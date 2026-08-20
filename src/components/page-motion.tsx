@@ -325,20 +325,12 @@ export function PageMotion() {
         if (!chapter) continue;
         const chapterBox = chapter.getBoundingClientRect();
         const imageHeight = target.element.getBoundingClientRect().height;
-        // The plate, not the window, is the frame the photograph pans inside, and the
-        // two are no longer the same height: the plate is sized to `lvh` so it reaches
-        // the real window edge behind iOS Safari's translucent toolbar, while
-        // `innerHeight` is the layout viewport that stops above it. Measuring the hidden
-        // remainder against the window would overstate it by that inset and pan the frame
-        // clear of the plate's bottom edge — reopening the very gap the plate closes.
-        const plateHeight =
-          target.element
-            .closest<HTMLElement>(".chapter-photo-pin")
-            ?.getBoundingClientRect().height ?? viewportHeight;
         target.top = chapterBox.top + scrollY;
         target.bottom = target.top + chapterBox.height;
         target.overflowRatio =
-          imageHeight > 0 ? Math.max(0, (imageHeight - plateHeight) / imageHeight) : 0;
+          imageHeight > 0
+            ? Math.max(0, (imageHeight - viewportHeight) / imageHeight)
+            : 0;
       }
 
       for (const chapter of document.querySelectorAll<HTMLElement>("[data-chapter]")) {
