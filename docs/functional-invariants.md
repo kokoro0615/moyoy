@@ -63,9 +63,14 @@ constrain intent; its four guide records are measurement aids only.
   recorded WCAG contrast deviation is required.
 - The open modal is anchored to the visible viewport, not the full document: right 0,
   top 0, and viewport height.
-- Use native modal-dialog semantics. Opening stores the invoker and scroll position,
-  makes the background inert, locks scroll without a jump, and focuses the explicit
-  close button. Tab/Shift+Tab remain inside the dialog.
+- Use a native `<dialog>` with modal semantics. Opening stores the invoker and scroll
+  position, makes the background inert, locks scroll without a jump, and focuses the
+  explicit close button. Tab/Shift+Tab remain inside the dialog. The dialog is opened
+  non-modally (`show()`) and the modality comes from the shell `inert` plus the focus
+  trap: the top layer sits above every z-index on the page, including the boxes that keep
+  Safari 26 from tinting the browser bars, and the drawer reaches the sampled window edge
+  on any narrow window (VF-47). For the same reason the scroll lock fixes the application
+  shell rather than `<body>`.
 - Escape and the visible ≥44×44 close button use one idempotent close path, restore the
   exact scroll position, remove inertness, and return focus to the invoker or stable menu
   fallback. Backdrop click does not close; no unapproved destination/history behavior

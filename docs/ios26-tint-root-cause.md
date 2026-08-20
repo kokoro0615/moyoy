@@ -381,12 +381,37 @@ Device checks:
 
 ## 9. Known limitations no page-level fix can reach
 
-- **Menu open on a narrow window.** The modal `<dialog>` is in the top layer, above the
-  shield. At 390 px it is 250 px wide and spans the full height, so it covers the sample
-  point and classifies as `IsSidebar` — a candidate — and the bars take its colour while the
-  menu is open. At 1440 px the drawer does not reach the midpoint and the shield still wins.
-  Its `::backdrop` takes the `containerResultFromBackdrop` path, which sets `isDimmingLayer`
-  and therefore `preferExistingColor`.
+- ~~**Menu open on a narrow window.**~~ **Closed by VF-47 — this was reachable after all,
+  and it had a second cause.** The two are recorded here because the first was written up
+  as impossible and the second was never seen.
+
+  1. The modal `<dialog>` is in the top layer, above the shield. At 390 px it is 250 px
+     wide and spans the full height, so it covers the sample point and classifies as
+     `IsSidebar` — a candidate — and the bars took its colour while the menu was open. Its
+     `::backdrop` also takes the `containerResultFromBackdrop` path, which sets
+     `isDimmingLayer` and therefore `preferExistingColor`. Both follow from the top layer,
+     and nothing obliges the drawer to be in it: opening with `show()` instead of
+     `showModal()` returns it to its declared `z-index: 100`, below the shield's 120, and
+     generates no backdrop. What `showModal()` supplied — background inertness and a focus
+     trap — this component already hand-rolled, and the only real loss is the `cancel`
+     event, so Escape moved onto the dialog's own `keydown`.
+  2. **The scroll lock was a second, larger candidate, and it produced a paper band rather
+     than an olive one.** `body.menu-locked` was `position: fixed`, which makes `<body>` a
+     window-sized viewport-constrained box. §7.2 turns on the shield's ancestors not being
+     fixed; with the lock on, one of them was. The shield still took the hit and still
+     failed as `TooSmall`, and the lineage walk then reached the body and accepted it —
+     `primaryBackgroundColorForRenderer()` returning the paper `#ece7d8`. Measured against
+     the source predicate at 320, 390 and 768: candidate `body.menu-locked` at both edges.
+     The lock is now on `[data-app-shell]`, which the shields are siblings of, so their
+     lineage is `body` → `html` and neither is viewport-constrained.
+
+  This is the more useful shape of the finding: **any rule that makes an ancestor of the
+  shield `position: fixed` or `sticky` defeats it**, however far from the window edge that
+  ancestor's own purpose is. The e2e check covers both states — see
+  `tests/e2e/release-boundary.spec.ts`, "offers Safari no colour for either browser bar"
+  and "…with the menu open" — and asserts `:modal` is false as the half a hit test cannot
+  observe. At 1440 px the drawer never reached the midpoint, so neither defect was visible
+  on the desk; both were reported from a phone.
 - **Landscape.** `sidesRequiringFixedContainerEdges` adds `Left`/`Right` when those obscured
   insets are non-zero. The shields sit at the top and bottom midpoints, so a side edge would
   still be answered by the plate. Untested.

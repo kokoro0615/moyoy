@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import sharp from "sharp";
+
+import { settleMenu } from "../support/menu";
 
 const requiredViewports = [
   { height: 900, label: "1440x900", width: 1440 },
@@ -151,6 +154,108 @@ for (const viewport of [
  * companion half, that the shields paint nothing, is the visual suite: they are absent
  * from every baseline. See docs/ios26-tint-root-cause.md.
  */
+async function readEdgeCandidates(page: Page) {
+  return page.evaluate(() => {
+    // `sampleRectMargin` in LocalFrameView.cpp: the sampled point is the midpoint of
+    // each edge, inset by this much.
+    const MARGIN = 4;
+    // `compareWithViewportSize()`: below this share of the window on a side the box is
+    // `Smaller`, and a box that is `Smaller` on both is `TooSmall` — not a candidate.
+    const MINIMUM_RATIO = 0.9;
+
+    const isViewportConstrained = (element: Element) => {
+      const position = getComputedStyle(element).position;
+      return position === "fixed" || position === "sticky";
+    };
+
+    return (["top", "bottom"] as const).map((edge) => {
+      const x = window.innerWidth / 2;
+      const y = edge === "top" ? MARGIN : window.innerHeight - MARGIN;
+
+      // The sampler's first pass carries `IgnoreCSSPointerEventsProperty`, which
+      // `elementFromPoint` cannot. The shields are `pointer-events: none`, so the
+      // property is lifted for the read and restored immediately after it.
+      const shields = [...document.querySelectorAll<HTMLElement>(".chrome-shield")];
+      const restore = shields.map((shield) => shield.style.pointerEvents);
+      for (const shield of shields) shield.style.pointerEvents = "auto";
+      const hit = document.elementFromPoint(x, y);
+      for (const [index, shield] of shields.entries()) {
+        shield.style.pointerEvents = restore[index];
+      }
+
+      // What the sampler would find: the first fixed or sticky box in the lineage of
+      // the box it hit that is not `Smaller` on both axes.
+      let candidate: string | null = null;
+      for (
+        let element: Element | null = hit;
+        element;
+        element = element.parentElement
+      ) {
+        if (!isViewportConstrained(element)) continue;
+        const box = element.getBoundingClientRect();
+        const narrow = box.width < window.innerWidth * MINIMUM_RATIO;
+        const short = box.height < window.innerHeight * MINIMUM_RATIO;
+        if (narrow && short) continue;
+        candidate = element.className || element.tagName;
+        break;
+      }
+
+      const shield = document.querySelector<HTMLElement>(
+        `.chrome-shield[data-edge="${edge}"]`,
+      );
+      const box = shield?.getBoundingClientRect();
+      const style = shield ? getComputedStyle(shield) : null;
+      return {
+        background: style?.backgroundColor ?? "",
+        candidate,
+        coversPoint: Boolean(
+          box && box.left <= x && box.right >= x && box.top <= y && box.bottom >= y,
+        ),
+        // The sampled point is 4 px inside a rect the iOS UI process supplies, which
+        // need not be where CSS `bottom: 0` lands. The shield straddles the edge so it
+        // does not have to be.
+        overhangsEdge:
+          edge === "top"
+            ? Boolean(box && box.top <= -50)
+            : Boolean(box && box.bottom >= window.innerHeight + 50),
+        position: style?.position ?? "",
+        smallerOnBothAxes: Boolean(
+          box &&
+          box.width < window.innerWidth * MINIMUM_RATIO &&
+          box.height < window.innerHeight * MINIMUM_RATIO,
+        ),
+        takesTheHit: hit === shield,
+      };
+    });
+  });
+}
+
+function expectNoEdgeCandidate(
+  edges: Awaited<ReturnType<typeof readEdgeCandidates>>,
+  situation: string,
+) {
+  for (const [index, edge] of (["top", "bottom"] as const).entries()) {
+    const state = edges[index];
+    const where = `${edge} edge ${situation}`;
+    expect(state.position, `${where}: shield is viewport-fixed`).toBe("fixed");
+    expect(state.coversPoint, `${where}: shield covers the sampled point`).toBe(true);
+    expect(state.overhangsEdge, `${where}: shield straddles the window edge`).toBe(
+      true,
+    );
+    expect(state.takesTheHit, `${where}: shield takes the edge hit`).toBe(true);
+    // Without a background the shield is `IsHiddenOrTransparent`, which sets
+    // `retryHonoringPointerEvents` — and that retry steps over it to the plate.
+    expect(state.background, `${where}: shield declares a background`).not.toBe(
+      "rgba(0, 0, 0, 0)",
+    );
+    expect(
+      state.smallerOnBothAxes,
+      `${where}: shield is TooSmall rather than a candidate`,
+    ).toBe(true);
+    expect(state.candidate, `${where}: nothing qualifies as a fixed edge`).toBeNull();
+  }
+}
+
 test("offers Safari no colour for either browser bar", async ({ page }) => {
   await page.setViewportSize({ height: 844, width: 390 });
   await page.goto("/", { waitUntil: "networkidle" });
@@ -161,100 +266,51 @@ test("offers Safari no colour for either browser bar", async ({ page }) => {
   for (const offset of [0, 800, 2800, 3200, 3800, 4200, 4600, 5000]) {
     await page.evaluate((y) => window.scrollTo(0, y), offset);
     await page.waitForTimeout(80);
+    expectNoEdgeCandidate(await readEdgeCandidates(page), `at scrollY ${offset}`);
+  }
+});
 
-    const edges = await page.evaluate(() => {
-      // `sampleRectMargin` in LocalFrameView.cpp: the sampled point is the midpoint of
-      // each edge, inset by this much.
-      const MARGIN = 4;
-      // `compareWithViewportSize()`: below this share of the window on a side the box is
-      // `Smaller`, and a box that is `Smaller` on both is `TooSmall` — not a candidate.
-      const MINIMUM_RATIO = 0.9;
+/**
+ * VF-47. The same predicate with the drawer open, which is the state that used to break
+ * it. A modal `<dialog>` is in the top layer, above every z-index on the page including
+ * the shield's, and on a phone the panel covers the midpoint of both window edges — the
+ * single point the sampler hit-tests. Being full-height and part-width it is then
+ * `IsSidebar`, a candidate, and both bars filled with the drawer's olive for as long as
+ * the menu was open. The drawer is opened with `show()` instead, so it takes its declared
+ * `z-index: 100` and the shields keep the hit in both states.
+ *
+ * The sweep is by viewport rather than by scroll offset: the panel's share of the window
+ * is what decides whether it reaches the sampled point, and the body is scroll-locked
+ * while it is open. 390 is the reported device, 320 the narrowest supported window, and
+ * 768 one where the 250 px panel does not reach the midpoint at all.
+ */
+test("offers Safari no colour for either browser bar with the menu open", async ({
+  page,
+}) => {
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ height: 844, width });
+    await page.goto("/", { waitUntil: "networkidle" });
+    await page.evaluate(() => window.scrollTo(0, 3800));
+    await page.waitForTimeout(80);
 
-      const isViewportConstrained = (element: Element) => {
-        const position = getComputedStyle(element).position;
-        return position === "fixed" || position === "sticky";
-      };
+    await page.locator("button[data-fidelity-action='open-menu']").click();
+    await settleMenu(page);
+    await expect(
+      page.locator("dialog#site-menu[open][data-state='open']"),
+    ).toBeVisible();
 
-      return (["top", "bottom"] as const).map((edge) => {
-        const x = window.innerWidth / 2;
-        const y = edge === "top" ? MARGIN : window.innerHeight - MARGIN;
+    expectNoEdgeCandidate(await readEdgeCandidates(page), `at ${width} px, menu open`);
 
-        // The sampler's first pass carries `IgnoreCSSPointerEventsProperty`, which
-        // `elementFromPoint` cannot. The shields are `pointer-events: none`, so the
-        // property is lifted for the read and restored immediately after it.
-        const shields = [...document.querySelectorAll<HTMLElement>(".chrome-shield")];
-        const restore = shields.map((shield) => shield.style.pointerEvents);
-        for (const shield of shields) shield.style.pointerEvents = "auto";
-        const hit = document.elementFromPoint(x, y);
-        for (const [index, shield] of shields.entries()) {
-          shield.style.pointerEvents = restore[index];
-        }
-
-        // What the sampler would find: the first fixed or sticky box in the lineage of
-        // the box it hit that is not `Smaller` on both axes.
-        let candidate: string | null = null;
-        for (
-          let element: Element | null = hit;
-          element;
-          element = element.parentElement
-        ) {
-          if (!isViewportConstrained(element)) continue;
-          const box = element.getBoundingClientRect();
-          const narrow = box.width < window.innerWidth * MINIMUM_RATIO;
-          const short = box.height < window.innerHeight * MINIMUM_RATIO;
-          if (narrow && short) continue;
-          candidate = element.className || element.tagName;
-          break;
-        }
-
-        const shield = document.querySelector<HTMLElement>(
-          `.chrome-shield[data-edge="${edge}"]`,
-        );
-        const box = shield?.getBoundingClientRect();
-        const style = shield ? getComputedStyle(shield) : null;
-        return {
-          background: style?.backgroundColor ?? "",
-          candidate,
-          coversPoint: Boolean(
-            box && box.left <= x && box.right >= x && box.top <= y && box.bottom >= y,
-          ),
-          // The sampled point is 4 px inside a rect the iOS UI process supplies, which
-          // need not be where CSS `bottom: 0` lands. The shield straddles the edge so it
-          // does not have to be.
-          overhangsEdge:
-            edge === "top"
-              ? Boolean(box && box.top <= -50)
-              : Boolean(box && box.bottom >= window.innerHeight + 50),
-          position: style?.position ?? "",
-          smallerOnBothAxes: Boolean(
-            box &&
-            box.width < window.innerWidth * MINIMUM_RATIO &&
-            box.height < window.innerHeight * MINIMUM_RATIO,
-          ),
-          takesTheHit: hit === shield,
-        };
-      });
-    });
-
-    for (const [index, edge] of (["top", "bottom"] as const).entries()) {
-      const state = edges[index];
-      const where = `${edge} edge at scrollY ${offset}`;
-      expect(state.position, `${where}: shield is viewport-fixed`).toBe("fixed");
-      expect(state.coversPoint, `${where}: shield covers the sampled point`).toBe(true);
-      expect(state.overhangsEdge, `${where}: shield straddles the window edge`).toBe(
-        true,
-      );
-      expect(state.takesTheHit, `${where}: shield takes the edge hit`).toBe(true);
-      // Without a background the shield is `IsHiddenOrTransparent`, which sets
-      // `retryHonoringPointerEvents` — and that retry steps over it to the plate.
-      expect(state.background, `${where}: shield declares a background`).not.toBe(
-        "rgba(0, 0, 0, 0)",
-      );
-      expect(
-        state.smallerOnBothAxes,
-        `${where}: shield is TooSmall rather than a candidate`,
-      ).toBe(true);
-      expect(state.candidate, `${where}: nothing qualifies as a fixed edge`).toBeNull();
-    }
+    // The other half of the fix, which a hit test cannot observe: a modal dialog also puts
+    // a `::backdrop` over both edges, and WebKit reads that through
+    // `containerResultFromBackdrop()`, which sets `isDimmingLayer` and with it the
+    // `preferExistingColor` branch that freezes the bars. `:modal` matches only a dialog
+    // opened with `showModal()`, so this is the direct assertion that it was not.
+    expect(
+      await page.evaluate(() =>
+        document.querySelector("dialog#site-menu")!.matches(":modal"),
+      ),
+      `${width} px: drawer is not in the top layer`,
+    ).toBe(false);
   }
 });

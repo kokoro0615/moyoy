@@ -115,11 +115,23 @@ body {
   background: var(--paper);
 }
 
-body.menu-locked {
+/* VF-47. The drawer's scroll lock, applied to the app shell rather than to `<body>`.
+   A fixed `<body>` is a window-sized `position: fixed` box, which is precisely what Safari
+   26's edge sampler accepts: `.chrome-shield` still takes the hit and still fails as
+   `TooSmall`, but `fixedContainerEdges()` then walks the lineage of the box it hit, and
+   with the lock on `<body>` that walk reached the body and accepted it — filling both
+   browser bars with the paper `background-color` for as long as the menu was open.
+   Measured against the source predicate at 320, 390 and 768: the candidate at both edges
+   was `body.menu-locked`. The shields are siblings of the shell, so with the lock here
+   their lineage is `body` → `html`, neither of which is viewport-constrained.
+
+   A `position: fixed` ancestor does not become the containing block for a fixed
+   descendant — only transform, filter, perspective, `contain` and `will-change` do — so
+   the chapter plates inside the shell stay pinned to the window exactly as before. */
+[data-app-shell][data-scroll-locked] {
   position: fixed;
   inset-inline: 0;
   width: 100%;
-  overflow: hidden;
 }
 
 button,
@@ -1109,6 +1121,11 @@ footer[data-fidelity="footer"] {
   color: inherit;
 }
 
+/* The PC reference sets the word beside the mark, so it is anchored to the visual box's
+   left edge, which is the word's own ink edge. `nowrap` and a fixed text size are the two
+   guards the SP rule below depends on and which cost nothing here: the containing block is
+   only as wide as the word, so any substituted face that renders wider than the approved
+   one would otherwise wrap the word onto a second line. */
 .menu-word {
   position: absolute;
   top: 7.7px;
@@ -1118,6 +1135,9 @@ footer[data-fidelity="footer"] {
   font-weight: 400;
   line-height: 8px;
   letter-spacing: 0.7px;
+  white-space: nowrap;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
 }
 
 .menu-grid {
@@ -1235,7 +1255,10 @@ footer[data-fidelity="footer"] {
 }
 
 /* The approved frame shows the page at full brightness behind the open drawer, so the
-   backdrop stays clear; the panel earns its separation from its own edge, not a wash. */
+   backdrop stays clear; the panel earns its separation from its own edge, not a wash.
+   VF-47 opens the drawer with `show()`, so no `::backdrop` is generated at all and this
+   rule no longer matches anything — it is kept because it is the declaration of that
+   intent, and because a `::backdrop` would have to stay transparent if one ever returns. */
 .site-menu::backdrop {
   background: transparent;
 }
@@ -1916,11 +1939,43 @@ footer[data-fidelity="footer"] {
     height: 40.6px;
   }
 
+  /* VF-46. The SP reference stacks the word under the mark and centres both on one axis:
+     measured out of `sp-reference.svg`, the word's ink runs x 331.43–357.57 (26.14 px) and
+     the grid's x 334–355 (21 px), so both are centred on x 344.5. This rule anchored the
+     word to the box's LEFT edge instead, which only coincides while the rendered word is
+     exactly as wide as the approved one — and it was not. At 8.6 px the word measured
+     21.16 px in WebKit, putting its centre 2.5 px left of the mark it belongs under, and
+     25.00 px in Chromium, which quantises small advances per glyph: one declaration, two
+     different positions, neither of them the reference.
+
+     The word is therefore centred on the box, and the mark already is (21 px wide, inset
+     2.58 px from a 26.15 px box, measured centre 13.06 against the box's 13.07), so the two
+     now share an axis by construction rather than by the width of the text agreeing. It is
+     done with a translation rather than `text-align`, because the word's advance box is
+     wider than the 26.15 px it is centred in and all three engines clamp a centred line to
+     the start edge once it overflows — measured, `text-align: center` left the word 1.15 px
+     right of the mark in WebKit and 1.76 px in Chromium, which is the same class of defect
+     as the one being fixed.
+
+     The size was wrong with it. The approved ink width of 26.14 px needs 11 px with 0.66 px
+     of tracking in the shipping face — Jost, since the kit face is domain-locked and does
+     not resolve (docs/open-questions.md Q-05) — and that also reproduces the reference
+     x-height of 5.18 px (Jost's is 0.47 em → 5.17). The existing `top: 33px` is what
+     identified 8.6 px as the defect: with `line-height: 7.6px` it puts the baseline at
+     exactly the reference's 60.59 for an 11 px word, and 0.8 px high for an 8.6 px one.
+     The same shortfall is present on the PC control and is recorded, not fixed, here. */
   .menu-word {
     top: 33px;
-    font-size: 8.6px;
+    left: 50%;
+    right: auto;
+    font-size: 11px;
     line-height: 7.6px;
-    letter-spacing: 0.25px;
+    letter-spacing: 0.66px;
+    /* `letter-spacing` is applied after the final glyph as well, so the advance box being
+       centred is 0.66 px wider on the right than the ink inside it. Half of that is taken
+       back, which puts the INK — the thing the reference measures — on the axis. Measured
+       after, ink centre against mark centre: 0.04 px in WebKit, Chromium and Firefox. */
+    transform: translateX(calc(-50% + 0.33px));
   }
 
   .menu-grid {

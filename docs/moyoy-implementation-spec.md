@@ -436,22 +436,30 @@ review because no external exact-frame design exists.
 ### State
 
 - Menu button: default, hover, focus-visible, active, expanded.
-- Modal uses native `<dialog id="site-menu">` opened with `showModal()`, fixed to
+- Modal uses native `<dialog id="site-menu">` opened with `show()`, fixed to
   `inset-block: 0; inset-inline-end: 0`, width 250 px, and visual viewport height.
+  `show()` rather than `showModal()` because the top layer is painted and hit-tested
+  above every z-index on the page, which put the drawer over the `.chrome-shield` boxes
+  and made it the browser bars' colour source on any window narrow enough for the panel
+  to reach the edge midpoint (VF-47). Modality is supplied by the shell `inert` below.
 - The invoker is a real button with `aria-controls="site-menu"` and synchronized
-  `aria-expanded`. Opening stores the invoker, calls `showModal()`, then focuses the
+  `aria-expanded`. Opening stores the invoker, calls `show()`, then focuses the
   explicit close button. The dialog has `aria-modal="true"` and an accessible name.
 - `Tab`/`Shift+Tab` cycle only through current visible/enabled dialog focusables; if
   none remain, the close button receives focus. Focus never enters a closed dialog.
-- Modal top-layer behavior is supplemented by setting the application shell `inert`
+- Modality is carried entirely by setting the application shell `inert`
   (preserving/restoring any prior value) so pointer, focus, and assistive-technology
-  access to the background are deterministic.
-- Opening stores `scrollY` and locks the document with fixed-body positioning and
-  `top: -scrollY`; closing removes the lock and restores the exact position. Safe-area
-  insets pad content without changing the 250 px outer width.
-- The dialog `cancel` event prevents the browser default and routes Escape through the
-  same idempotent close routine. Closing restores focus to the stored invoker, or to the
-  header menu button if the original node is no longer connected.
+  access to the background are deterministic. This is what a non-modal `show()` gives up
+  and what has to replace it.
+- Opening stores `scrollY` and locks the document by fixing the **application shell** at
+  `top: -scrollY`; closing removes the lock and restores the exact position. The lock is
+  not on `<body>`, because a fixed `<body>` is a window-sized `position: fixed` box and
+  Safari 26 fills both browser bars from it (VF-47). Safe-area insets pad content without
+  changing the 250 px outer width.
+- Escape is handled on the dialog's own `keydown` and routed through the same idempotent
+  close routine; a non-modal dialog fires no `cancel` event, and the shell being `inert`
+  guarantees focus is inside the dialog whenever it is open. Closing restores focus to the
+  stored invoker, or to the header menu button if the original node is no longer connected.
 - An explicit visible close button has at least a 44×44 CSS px target and visible
   focus. Backdrop/outside click does not close the dialog because that gesture is not
   approved. No history mutation or unapproved link destination is added.

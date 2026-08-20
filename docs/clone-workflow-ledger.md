@@ -350,3 +350,62 @@ Three defects, only the first of which the owner could see:
 | `pnpm test:e2e` at default parallelism | **environmentally unreliable on this workstation** — `networkidle` timeouts in unrelated tests, reproduced on the unmodified baseline (7 failures). Runs are bounded to 2–4 workers |
 | WebKit / mobile-context visual baselines | still absent |
 | `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
+
+## 2026-08-21 session — the SP menu label and the drawer's browser-bar bands
+
+- **Mode:** unchanged (authorized client rebuild; existing-product defect fix).
+- **Production owner:** unchanged — the main conversation.
+- **In scope:** two owner-reported defects, both observed on a physical iPhone.
+  VF-46 — the mobile `menu` label is out of position under its mark and reads as broken.
+  VF-47 — opening and closing the menu brings a band back at the bottom of the screen.
+- **Out of scope, unchanged:** everything recorded in the previous sessions. The PC menu
+  label carries the same size defect as the SP one and is deliberately **not** corrected;
+  it is recorded as Q-28 because correcting it moves the approved 1200 px page-top frame.
+
+### Reference and rights
+
+No new target site was visited and no asset was downloaded. No production asset changed.
+Both corrections were measured out of the approved private references already in the
+repository — `sp-reference.svg` and `pc-reference.svg` — by reading the geometry of the
+outlined glyph and mark paths in the top-right region directly, not by eye and not from
+a raster (the control is authored in the paper colour and is invisible in the PNG).
+
+### Assets touched
+
+None. Seven visual baselines under `tests/visual/__screenshots__/` were regenerated.
+
+### Comparison performed
+
+| Check | Result |
+| --- | --- |
+| Reference-vs-render, SP mark, 3 engines | ink width 26.12 (WebKit) / 27.33 (Chromium) / 26.14 (Firefox) against the reference's 26.14; ink centre against mark centre 0.09 / 0.06 / 0.06 px; one line box everywhere |
+| Widths swept, closed state | 320, 375, 390, 393, 414, 430, 639 — geometry identical at all seven |
+| Edge-candidate predicate, menu closed | 8 scroll offsets × 2 edges, Chromium / Firefox / WebKit: no candidate |
+| Edge-candidate predicate, menu open | 320, 390, 768 × 2 edges, Chromium / Firefox / WebKit: no candidate; `:modal` false |
+| Drawer behaviour after leaving the top layer | 3 engines × 390 / 768 / 1440: geometry, paint order, focus entry, focus return, `aria-expanded`, `inert`, Escape, scroll lock and scroll restoration all unchanged |
+| `pnpm test:visual` | 21 baselines pass **before** regeneration — the change sits under the 0.001 diff-ratio tolerance. Regenerated anyway so the baseline is the shipped render; the changed pixels are confined to the SP mark (x ≥ 325, y ≤ 90) plus 11 pixels of photograph decode noise across three frames |
+
+### Root cause
+
+VF-46: the label was anchored to the box's left edge where the reference centres it on the
+mark's axis, and was set 27 % small; the two compounded into a visible lateral shift whose
+size differs per engine. The size error was identified by the existing `top: 33px`, which
+is the baseline for an 11 px word and not for the 8.6 px one that shipped.
+
+VF-47: two defects, both of which create a Safari 26 edge candidate only while the drawer
+is open. The modal `<dialog>` sits in the top layer above `.chrome-shield` and classifies
+as `IsSidebar`; and the scroll lock made `<body>` `position: fixed`, which the shield's
+own lineage walk then reached and accepted, returning the paper colour. The general form —
+**any rule that makes an ancestor of a shield viewport-constrained defeats it** — is
+recorded in `docs/ios26-tint-root-cause.md` §9, replacing the entry that called the first
+of these unfixable.
+
+### Still unresolved after this session
+
+| Item | State |
+| --- | --- |
+| VF-46 and VF-47 on the owner's device | measured on three engines under Playwright, which is not iOS Safari; **a device re-check is required to close either** |
+| PC menu label size (Q-28) | **out of scope by decision** — 14 % short of the approved 30.51 px of ink, left as an unresolved fidelity diff pending owner approval |
+| `pnpm test:e2e` at default parallelism | **environmentally unreliable, unchanged.** One WebKit test (`the chapter plate is viewport-fixed and the photograph pans through its frame`) fails under three-engine load and passes in isolation; reproduced identically on the unmodified baseline, so it is not a property of this change |
+| WebKit / mobile-context visual baselines | still absent |
+| `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
