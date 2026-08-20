@@ -87,6 +87,10 @@ interface CrossingTarget {
  */
 interface PanTarget {
   readonly element: HTMLElement;
+  /** The chapter's masked window, which owns the geometry both layers below read. */
+  photo: HTMLElement | null;
+  /** The document-level copy of the photograph that answers the browser-bar strips. */
+  mirror: HTMLElement | null;
   /**
    * The document-level layer that answers the browser-bar strips, carried here because it
    * is placed by the frame's own geometry: the same box, the same offset. Only its offset
@@ -94,6 +98,8 @@ interface PanTarget {
    * repainted for it.
    */
   bleed: HTMLElement | null;
+  /** Set once the layer has been seen in its pinned position; never unset afterwards. */
+  confirmed: boolean;
   bottom: number;
   imageHeight: number;
   overflowRatio: number;
@@ -111,6 +117,36 @@ interface PanTarget {
  * both with room to spare.
  */
 const CHAPTER_BLEED = 240;
+
+/**
+ * Slack held back from the photograph's travel so the browser-bar mirror always spans the
+ * whole screen, and the floor under the estimate of the status bar's own height.
+ *
+ * The page knows the screen height and the window height, but not where the window sits
+ * between them, and the two strips are not a fixed ratio of the difference: measured on an
+ * iPhone, the status bar is a constant 62.8 CSS px while the toolbar is 58.1 collapsed and
+ * 98.1 expanded, so the top's share moves from 52 % to 39 % of the same quantity. One
+ * fraction cannot serve both, which leaves `env(safe-area-inset-top)` as the only signal
+ * that tracks the constant.
+ *
+ * It cannot be trusted alone. WebKit 301994 has it returning 0 on several shipping iOS
+ * versions, and a zero there would put the photograph's top edge inside the status bar with
+ * the flat fill above it — the defect this layer exists to remove. Hence a floor: the
+ * estimate is whichever of the two is larger.
+ *
+ * The arithmetic these two numbers have to satisfy, for the shortest approved derivative
+ * (927.6 CSS px rendered against an 874 px screen):
+ *
+ *     cover the status bar     topCover >= 62.8
+ *     cover the toolbar        imageHeight - topCover - innerHeight - travel >= toolbar
+ *
+ * At 67 and 29.6 the photograph reaches 67 to 96.6 px above the window and 117 to 146.6 px
+ * below it, against 62.8 and 98.1 needed. Both hold in either toolbar state, and they still
+ * hold if the safe-area inset reports zero.
+ */
+const MIRROR_SAFETY = 24;
+const STATUS_BAR_FLOOR = 56;
+const MIRROR_MARGIN = 8;
 
 /** Linear read of a colour ramp at `position` in 0…1, returned as an `rgb()` string. */
 function sampleRamp(ramp: readonly string[], position: number): string {
@@ -244,12 +280,32 @@ export function PageMotion() {
     let menuBand: Band | null = null;
     let loopFrame = 0;
     let measureFrame = 0;
+    let confirmFrame = 0;
     let idleFrames = 0;
     let lastScroll = Number.NaN;
     /** Cached in `measure()` so the animation path never forces a layout. */
     let maximumScroll = 0;
+    /** The window height the mirror's endpoints were derived at; see `measure()`. */
+    let measuredHeight = 0;
+    /** `env(safe-area-inset-top)`, read through a probe because CSS cannot hand it over. */
+    let safeAreaTop = 0;
 
     const isCompact = () => window.innerWidth < COMPACT_WIDTH;
+    /**
+     * `env(safe-area-inset-top)` is not readable from script, so it is measured through a
+     * throwaway box. It stands in for the status bar's own height, which is the one part of
+     * the difference between the screen and the window that does not change as the address
+     * bar collapses.
+     */
+    const readSafeAreaTop = () => {
+      const probe = document.createElement("div");
+      probe.style.cssText =
+        "position:fixed;top:0;left:0;width:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top,0px)";
+      document.body.append(probe);
+      const inset = probe.getBoundingClientRect().height;
+      probe.remove();
+      return Number.isFinite(inset) ? inset : 0;
+    };
     const pick = (pair: readonly [number, number]) => (isCompact() ? pair[1] : pair[0]);
     /**
      * Both artboards are zoomed, so artboard px are scaled on the way out. The divisor
@@ -320,7 +376,13 @@ export function PageMotion() {
             element
               .closest<HTMLElement>(".chapter-photo")
               ?.querySelector<HTMLElement>(".chapter-photo-bleed") ?? null,
+          mirror:
+            element
+              .closest<HTMLElement>(".chapter-photo")
+              ?.querySelector<HTMLElement>(".chapter-photo-mirror") ?? null,
+          photo: element.closest<HTMLElement>(".chapter-photo"),
           bottom: 0,
+          confirmed: false,
           element,
           imageHeight: 0,
           overflowRatio: 0,
@@ -342,9 +404,10 @@ export function PageMotion() {
           target.element.style.setProperty(axis.property, "0px");
       }
       for (const target of pans) {
-        target.element.style.setProperty("--chapter-pan-y", "0%");
-        target.bleed?.style.setProperty("--chapter-window", "0px");
-        target.bleed?.style.setProperty("--chapter-bleed", "0px");
+        target.element.style.removeProperty("--chapter-pan-y");
+        target.photo?.style.setProperty("--chapter-pan-y", "0%");
+        target.photo?.style.setProperty("--chapter-window", "0px");
+        target.photo?.style.setProperty("--chapter-bleed", "0px");
         target.bleed?.style.setProperty("--chapter-window-y", "0px");
         target.written = ["", ""];
       }
@@ -353,6 +416,8 @@ export function PageMotion() {
     /** Cache untransformed document geometry; never called from the animation path. */
     function measure() {
       measureFrame = 0;
+      measuredHeight = window.innerHeight;
+      safeAreaTop = readSafeAreaTop();
       collect();
       reset();
       // Every band below is a client rect plus the scroll offset, and the two have to be
@@ -392,18 +457,50 @@ export function PageMotion() {
           imageHeight > 0
             ? Math.max(0, (imageHeight - viewportHeight) / imageHeight)
             : 0;
-        // The bleed's content box is the window and its borders are the strips beyond it.
-        // Client rects are window pixels and the layer lives inside the zoomed artboard, so
-        // both lengths are divided back into artboard units the way every other offset
-        // written here is.
-        target.bleed?.style.setProperty(
+        // The window and the strips beyond it, in artboard units: client rects are window
+        // pixels and both layers live inside the zoomed artboard, so every length written
+        // here is divided back the way every other offset is. They go on the chapter's own
+        // window so the fill and the mirror read the same numbers.
+        target.photo?.style.setProperty(
           "--chapter-window",
           `${(viewportHeight / scale).toFixed(2)}px`,
         );
-        target.bleed?.style.setProperty(
+        target.photo?.style.setProperty(
           "--chapter-bleed",
           `${(CHAPTER_BLEED / scale).toFixed(2)}px`,
         );
+
+        // The mirror's two keyframe endpoints. A perfect pin puts its box top one bleed
+        // above the window at every scroll offset, so the translation it needs is
+        // `scrollY - bleed - (the chapter's own document top)` — and the scroll timeline
+        // interpolates linearly between the value at scroll 0 and the value at maximum
+        // scroll, which is exactly these two.
+        //
+        // Both are derived from the chapter's MEASURED document top rather than from a CSS
+        // expression meant to cancel one, and both are re-derived whenever the window height
+        // changes. Measured on the diagnostic: cancelling expressions still round separately
+        // during layout and left 0.22 CSS px behind, and endpoints left stale across an
+        // address-bar collapse put an error of 0.75 % of the scroll offset into the pin —
+        // small near the top of the document and compounding all the way down it.
+        const mirror = target.mirror;
+        if (mirror) {
+          mirror.style.setProperty(
+            "--chapter-mirror-height",
+            `${((viewportHeight + 2 * CHAPTER_BLEED) / scale).toFixed(2)}px`,
+          );
+          mirror.style.setProperty(
+            "--chapter-mirror-inset",
+            `${(CHAPTER_BLEED / scale).toFixed(2)}px`,
+          );
+          mirror.style.setProperty(
+            "--chapter-mirror-from",
+            `${((-CHAPTER_BLEED - target.top) / scale).toFixed(2)}px`,
+          );
+          mirror.style.setProperty(
+            "--chapter-mirror-to",
+            `${((maximumScroll - CHAPTER_BLEED - target.top) / scale).toFixed(2)}px`,
+          );
+        }
       }
 
       for (const chapter of document.querySelectorAll<HTMLElement>("[data-chapter]")) {
@@ -430,11 +527,55 @@ export function PageMotion() {
 
       lastScroll = Number.NaN;
       render();
+      requestConfirm();
     }
 
     function requestMeasure() {
       if (measureFrame) return;
       measureFrame = window.requestAnimationFrame(measure);
+    }
+
+    /**
+     * Reveal a mirror only once it is actually where it belongs.
+     *
+     * Writing the keyframe endpoints is not the same as the animation having applied them.
+     * Measured in WebKit at 402 x 714: on the first frames after load the mirrors sat up to
+     * 2 681 CSS px away from their pinned position, which on a device is a flash of the
+     * wrong part of the photograph inside both browser bars. Chromium applied them
+     * immediately. So the gate is the position itself, checked for a bounded number of
+     * frames after each measure and never on the scroll path.
+     */
+    function confirmMirrors(remaining = 30) {
+      confirmFrame = 0;
+      let pending = false;
+      for (const target of pans) {
+        const mirror = target.mirror;
+        // Confirmed once, and then left alone. The check reads the main thread's copy of a
+        // threaded animation's transform, and in WebKit that copy converges a few frames
+        // after the scroll offset it belongs to. Re-running it after every measure would
+        // hide a perfectly correct mirror for a few frames whenever the address bar changed
+        // the window height — a flicker of the flat fill at exactly the moments this layer
+        // exists to fix. What needs preventing is the initial flash, and that happens once.
+        if (!mirror || target.confirmed) continue;
+        if (!mirror.style.getPropertyValue("--chapter-mirror-to")) {
+          pending = true;
+          continue;
+        }
+        if (Math.abs(mirror.getBoundingClientRect().top + CHAPTER_BLEED) <= 1) {
+          target.confirmed = true;
+          mirror.dataset.mirror = "ready";
+        } else pending = true;
+      }
+      if (pending && remaining > 0) {
+        confirmFrame = window.requestAnimationFrame(() =>
+          confirmMirrors(remaining - 1),
+        );
+      }
+    }
+
+    function requestConfirm() {
+      if (confirmFrame) return;
+      confirmFrame = window.requestAnimationFrame(() => confirmMirrors());
     }
 
     /**
@@ -465,7 +606,16 @@ export function PageMotion() {
       }
 
       const viewportHeight = window.innerHeight;
+      // The mirror's endpoints are a function of the window height, and iOS changes the
+      // window height whenever the address bar collapses or expands. `resize` alone did not
+      // catch it on the device: measured on the diagnostic, endpoints left stale across one
+      // collapse put an error of 0.75 % of the scroll offset into the pin — 11.8 px at
+      // scrollY 1817 and 28.5 px at 3916, invisible at the top of the page and compounding
+      // all the way down it. This is one integer comparison per frame and schedules the
+      // re-measure for the next one; the 1 : 1 tracking itself stays CSS's.
+      if (viewportHeight !== measuredHeight) requestMeasure();
       const scale = scaleOf();
+      const compact = isCompact();
 
       for (const target of crossings) {
         const span = target.end - target.start;
@@ -476,21 +626,55 @@ export function PageMotion() {
         }
       }
 
+      // The screen, the window, and therefore the strips the browser bars occupy. The
+      // split between them cannot be read directly, so the top is estimated from the
+      // safe-area inset — constant, and close to the status bar — and whatever is left of
+      // the difference is the toolbar's.
+      const screenHeight = window.screen?.height ?? viewportHeight;
+      const strips = Math.max(0, screenHeight - viewportHeight);
+      const topCover = compact
+        ? Math.min(strips, Math.max(safeAreaTop, STATUS_BAR_FLOOR) + MIRROR_MARGIN)
+        : 0;
+
       for (const target of pans) {
-        if (target.overflowRatio === 0) {
-          target.element.style.setProperty("--chapter-pan-y", "0%");
+        if (target.imageHeight === 0) {
+          target.photo?.style.setProperty("--chapter-pan-y", "0%");
           continue;
         }
         // The chapter is on screen from the frame its top edge reaches the viewport
         // bottom until its bottom edge leaves the viewport top.
-        const travel = target.bottom - target.top + viewportHeight;
+        const crossing = target.bottom - target.top + viewportHeight;
         const progress = clamp(
-          (scrollY - (target.top - viewportHeight)) / travel,
+          (scrollY - (target.top - viewportHeight)) / crossing,
           0,
           1,
         );
-        const pan = -progress * target.overflowRatio * CHAPTER_PAN_STRENGTH;
-        target.element.style.setProperty(
+        // How far the frame may travel, and where it starts.
+        //
+        // On a desktop window this is unchanged: the whole hidden remainder is traversed
+        // once, which is the published acceptance criterion at 1440 x 900.
+        //
+        // Where the browser draws its own bars over the page, the same photograph also has
+        // to reach past both window edges, and it cannot do both. Measured on an iPhone at
+        // 402 x 714: the SP derivative renders 927.7 CSS px tall against a 874 px screen, so
+        // 53.7 px of it is spare once the screen is covered, against 213.7 px of travel if
+        // only the window has to be covered. Something has to give, and DA-MEDIA-01 asks for
+        // a photograph that does not scroll, so what gives is the travel. The frame also has
+        // to start above the window rather than level with it, because a photograph whose
+        // top edge is at the window's top edge cannot appear above it. Both consequences are
+        // recorded as deviations; both disappear if derivatives with vertical context are
+        // ever produced.
+        const travel = Math.max(
+          0,
+          compact
+            ? target.imageHeight - screenHeight - MIRROR_SAFETY
+            : target.imageHeight - viewportHeight,
+        );
+        const offset = -topCover - progress * travel * CHAPTER_PAN_STRENGTH;
+        const pan = offset / target.imageHeight;
+        // On the chapter, not on the plate's image: the mirror's image is in a sibling
+        // subtree and can only receive this by inheritance from their common ancestor.
+        target.photo?.style.setProperty(
           "--chapter-pan-y",
           `${(pan * 100).toFixed(3)}%`,
         );
@@ -503,13 +687,13 @@ export function PageMotion() {
           `${((scrollY - target.top) / scale).toFixed(2)}px`,
         );
         // Where the window's two edges fall on the frame, and therefore which colours the
-        // strips beyond them have to hold. The pan moves the frame up, so the window opens
-        // that much further down it.
-        const offset = -pan * target.imageHeight;
-        const edgeTop = sampleRamp(target.ramp, offset / target.imageHeight);
+        // strips beyond them have to hold if the mirror is unavailable. The pan moves the
+        // frame up, so the window opens that much further down it.
+        const window0 = -offset;
+        const edgeTop = sampleRamp(target.ramp, window0 / target.imageHeight);
         const edgeBottom = sampleRamp(
           target.ramp,
-          (offset + viewportHeight) / target.imageHeight,
+          (window0 + viewportHeight) / target.imageHeight,
         );
         // A colour write repaints the strip, unlike the transform above, so only a colour
         // that actually changed is written.
@@ -560,7 +744,7 @@ export function PageMotion() {
     // half viewports early, so a chapter can never arrive before its frame has decoded.
     const deferred = [
       ...document.querySelectorAll<HTMLImageElement>(
-        '.chapter-photo-pin img[loading="lazy"]',
+        '.chapter-photo img[loading="lazy"]',
       ),
     ];
     const preloader =
@@ -569,7 +753,13 @@ export function PageMotion() {
             (entries, self) => {
               for (const entry of entries) {
                 if (!entry.isIntersecting) continue;
-                entry.target.querySelector("img")?.removeAttribute("loading");
+                // Every deferred image in the chapter, not the first one. The chapter now
+                // holds the photograph twice — once on the plate and once on the mirror
+                // that answers the browser bars — and taking only the first left the plate
+                // itself lazy, so it arrived after its own chapter did.
+                for (const image of entry.target.querySelectorAll("img[loading]")) {
+                  image.removeAttribute("loading");
+                }
                 self.unobserve(entry.target);
               }
             },
@@ -589,7 +779,7 @@ export function PageMotion() {
     // A `<source>` intrinsic box is a promise, not a measurement: re-measure once each
     // frame has actually decoded so the pan range is taken from the real rendered box.
     const photographs = [
-      ...document.querySelectorAll<HTMLImageElement>(".chapter-photo-pin img"),
+      ...document.querySelectorAll<HTMLImageElement>(".chapter-photo img"),
     ];
     for (const photograph of photographs) {
       photograph.addEventListener("load", requestMeasure);
@@ -598,12 +788,15 @@ export function PageMotion() {
     window.addEventListener("scroll", wake, { passive: true });
     window.addEventListener("resize", requestMeasure, { passive: true });
     window.addEventListener("pageshow", requestMeasure);
+    // The visual viewport reports a collapsing address bar directly, where `resize` may not.
+    window.visualViewport?.addEventListener("resize", requestMeasure);
     reducedMotion.addEventListener("change", requestMeasure);
 
     return () => {
       window.removeEventListener("scroll", wake);
       window.removeEventListener("resize", requestMeasure);
       window.removeEventListener("pageshow", requestMeasure);
+      window.visualViewport?.removeEventListener("resize", requestMeasure);
       reducedMotion.removeEventListener("change", requestMeasure);
       observer?.disconnect();
       preloader?.disconnect();
@@ -613,6 +806,7 @@ export function PageMotion() {
       }
       if (loopFrame) window.cancelAnimationFrame(loopFrame);
       if (measureFrame) window.cancelAnimationFrame(measureFrame);
+      if (confirmFrame) window.cancelAnimationFrame(confirmFrame);
       document.body.style.removeProperty("background-color");
       reset();
     };

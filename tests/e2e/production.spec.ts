@@ -87,7 +87,7 @@ test("SP chapter photography covers the viewport without distorting the source",
     await page.goto("/", { waitUntil: "networkidle" });
 
     for (const chapter of chapters) {
-      const image = page.locator(`section#${chapter} .chapter-photo img`);
+      const image = page.locator(`section#${chapter} .chapter-photo-pin img`);
       // The plate is viewport-fixed, so the section is what has to be scrolled to.
       await page.locator(`section#${chapter}`).scrollIntoViewIfNeeded();
       await image.evaluate((element: HTMLImageElement) => element.decode());
@@ -149,7 +149,7 @@ test("wide chapter photography is never enlarged beyond its selected derivative"
   await page.setViewportSize({ height: 1440, width: 2560 });
   await page.goto("/", { waitUntil: "networkidle" });
   for (const chapter of chapters) {
-    const image = page.locator(`section#${chapter} .chapter-photo img`);
+    const image = page.locator(`section#${chapter} .chapter-photo-pin img`);
     // The plate is viewport-fixed, so the section is what has to be scrolled to.
     await page.locator(`section#${chapter}`).scrollIntoViewIfNeeded();
     await image.evaluate((element: HTMLImageElement) => element.decode());
@@ -907,13 +907,20 @@ test("every piece of decorative line artwork carries a scroll offset", async ({
   expect([...foregroundOffsets]).toEqual(["none"]);
 
   // Reduced motion still returns the whole system to the authored composition.
+  //
+  // Polled rather than sampled after a fixed settle. The controller reacts to the media
+  // change on its own animation frame, so a single read taken inside that frame sees the
+  // transforms the page had a moment earlier — which made this check fail about one run in
+  // three, on the unmodified baseline as well. The assertion is unchanged; only the wait
+  // for it now depends on the page rather than on the machine.
   await page.emulateMedia({ reducedMotion: "reduce" });
   await scrollAndSettle(page, 1400);
-  const still = await sample();
   for (const selector of selectors) {
-    expect(new Set(still[selector]), `${selector} under reduced motion`).toEqual(
-      new Set(["0,0"]),
-    );
+    await expect
+      .poll(async () => [...new Set((await sample())[selector])].sort().join("|"), {
+        timeout: 5_000,
+      })
+      .toBe("0,0");
   }
 });
 
@@ -951,5 +958,202 @@ test("the SP composition holds one scale, so type keeps its place on the artwork
     expect(actual.offsetX, `${width}px prose x`).toBeCloseTo(authored.offsetX, 3);
     expect(actual.offsetY, `${width}px prose y`).toBeCloseTo(authored.offsetY, 3);
     expect(actual.lineCentre, `${width}px cue centre`).toBeCloseTo(0.5, 2);
+  }
+});
+
+test("the browser-bar mirror is document content, holds still, and adds nothing else", async ({
+  browserName,
+  page,
+}) => {
+  // iOS Safari's bars are translucent over the document's own scrolled paint, and a
+  // `position: fixed` box is clipped to the window and never reaches them. The mirror is
+  // the layer that does. Nothing here can prove it looks right inside a bar — no desktop
+  // engine draws one — but these are the properties that let it, and each of them was a
+  // defect at some point while it was being built.
+  await page.setViewportSize({ height: 714, width: 402 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/", { waitUntil: "networkidle" });
+
+  const supported = await page.evaluate(
+    () =>
+      CSS.supports("animation-timeline", "scroll(root block)") &&
+      CSS.supports("animation-duration", "auto"),
+  );
+  test.info().annotations.push({
+    description: String(supported),
+    type: `scroll-timeline support in ${browserName}`,
+  });
+
+  for (const chapter of chapters) {
+    const mirror = page.locator(`section#${chapter} .chapter-photo-mirror`);
+    await expect(mirror).toHaveCount(1);
+    // Never fixed and never sticky. A viewport-constrained box at a window edge is what
+    // Safari samples for its bar colour, and the whole point of the shield layer is that
+    // nothing on this page offers it one. Where scroll timelines are absent the whole rule
+    // never applies and the box keeps its static default, which satisfies the same contract.
+    const position = await mirror.evaluate(
+      (element) => getComputedStyle(element).position,
+    );
+    expect(["absolute", "static"], `${chapter} mirror position`).toContain(position);
+    expect(position).not.toBe("fixed");
+    expect(position).not.toBe("sticky");
+  }
+
+  // Exactly one image per chapter carries an accessible name: the mirror is a second copy
+  // of the same photograph and must not become a second entry in the accessibility tree.
+  for (const chapter of chapters) {
+    const named = await page
+      .locator(`section#${chapter} .chapter-photo img`)
+      .evaluateAll(
+        (nodes) =>
+          nodes.filter(
+            (node) =>
+              (node as HTMLImageElement).alt !== "" &&
+              node.getAttribute("aria-hidden") !== "true",
+          ).length,
+      );
+    expect(named, `${chapter} accessible images`).toBe(1);
+  }
+
+  const documentHeight = await page.evaluate(
+    () => (document.scrollingElement as Element).scrollHeight,
+  );
+
+  if (!supported) {
+    // No scroll timeline means no mirror at all, and nothing further to measure: the page is
+    // exactly the page that shipped before it.
+    for (const chapter of chapters) {
+      expect(
+        await page
+          .locator(`section#${chapter} .chapter-photo-mirror`)
+          .evaluate((element) => getComputedStyle(element).display),
+        `${chapter} without a scroll timeline`,
+      ).toBe("none");
+    }
+    return;
+  }
+
+  // One settled scroll before the measurements. WebKit applies a scroll-driven animation a
+  // frame or two after the element is first laid out, and a reading taken inside that
+  // window is the untransformed position, not a tracking failure.
+  await page.evaluate(() => window.scrollTo(0, 2600));
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (document.querySelector("#root .chapter-photo-mirror") as HTMLElement)
+              .dataset.mirror ?? "",
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe("ready");
+  await page.waitForTimeout(400);
+
+  for (const offset of [2600, 3400, 4200, 5000, 5600]) {
+    await page.evaluate((value) => window.scrollTo(0, value), offset);
+    // Poll the quantity being asserted, not a proxy for it: WebKit's main-thread copy of a
+    // threaded animation's transform converges a few frames after the scroll it belongs to,
+    // so a fixed wait here measures machine load rather than the page.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() =>
+            Math.abs(
+              (
+                document.querySelector("#root .chapter-photo-mirror") as HTMLElement
+              ).getBoundingClientRect().top + 240,
+            ),
+          ),
+        { timeout: 5_000 },
+      )
+      .toBeLessThan(0.5);
+    const state = await page.evaluate(() => {
+      const photo = document.querySelector(
+        "#root .chapter-photo-mirror",
+      ) as HTMLElement;
+      const plate = document.querySelector("#root .chapter-photo-pin") as HTMLElement;
+      return {
+        documentHeight: (document.scrollingElement as Element).scrollHeight,
+        mirrorTop: photo.getBoundingClientRect().top,
+        plateTop: plate.getBoundingClientRect().top,
+        platePosition: getComputedStyle(plate).position,
+        ready: photo.dataset.mirror ?? "",
+      };
+    });
+
+    // The counter-translated layer must not extend the document it is scaled against.
+    // Measured in Chromium before `overflow: clip` was added to the band: `scrollHeight`
+    // grew once the translation passed the document's end, which moved the endpoint the
+    // mirror is derived from, which moved the mirror, which grew the document again.
+    expect(state.documentHeight, `document height at ${offset}`).toBe(documentHeight);
+    // DA-MEDIA-01's own plate is untouched by any of this.
+    expect(state.platePosition).toBe("fixed");
+    expect(state.plateTop).toBeCloseTo(0, 1);
+
+    expect(state.ready, "confirmed in place before the mirror is shown").toBe("ready");
+    // One bleed above the window, at every scroll offset.
+    expect(state.mirrorTop, `mirror top at ${offset}`).toBeCloseTo(-240, 0);
+  }
+
+  // The seam. The mirror continues the plate's own frame past the window edge, so the two
+  // images have to occupy exactly the same screen position: any difference is a step in the
+  // middle of a photograph, right where the browser bar draws it.
+  //
+  // This is the contract that was missing when the travel was written onto the plate's image
+  // instead of onto the chapter. Custom properties inherit down, not sideways, so the
+  // mirror's image never received it, fell back to zero, and the photograph jumped by 25 to
+  // 55 CSS px at the window edge — by an amount that changed as the page scrolled.
+  //
+  // The device reports an 874 px screen and the compact branch of the travel is written
+  // against it, so it is stated here; without it a desktop run never exercises that branch.
+  await page.addInitScript(() =>
+    Object.defineProperty(window.screen, "height", { get: () => 874 }),
+  );
+  await page.reload({ waitUntil: "networkidle" });
+
+  const worstSeam = () =>
+    page.evaluate(() =>
+      Math.max(
+        0,
+        ...[...document.querySelectorAll("[data-chapter]")].map((chapter) => {
+          const mirror = chapter.querySelector(".chapter-photo-mirror") as HTMLElement;
+          if (mirror.dataset.mirror !== "ready") return 0;
+          const plate = chapter
+            .querySelector(".chapter-photo-pin img")!
+            .getBoundingClientRect();
+          const copy = chapter
+            .querySelector(".chapter-photo-mirror img")!
+            .getBoundingClientRect();
+          return Math.abs(copy.top - plate.top);
+        }),
+      ),
+    );
+
+  for (const offset of [2800, 3400, 4000, 4600, 5200, 4600, 3400, 2800]) {
+    await page.evaluate((value) => window.scrollTo(0, value), offset);
+    await expect.poll(worstSeam, { timeout: 5_000 }).toBeLessThan(0.5);
+  }
+
+  // And the same across a window height change, which is what the address bar does.
+  for (const height of [754, 660, 714]) {
+    await page.setViewportSize({ height, width: 402 });
+    await page.evaluate(() => window.scrollTo(0, 4000));
+    await expect.poll(worstSeam, { timeout: 5_000 }).toBeLessThan(0.5);
+  }
+
+  // Released from the window, the chapter shows its whole photograph in ordinary flow and
+  // there are no strips left to answer.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  for (const chapter of chapters) {
+    await expect
+      .poll(
+        () =>
+          page
+            .locator(`section#${chapter} .chapter-photo-mirror`)
+            .evaluate((element) => getComputedStyle(element).display),
+        { timeout: 5_000 },
+      )
+      .toBe("none");
   }
 });

@@ -466,3 +466,80 @@ whenever an answer changes architecture, content, rights, or acceptance.
   on 2026-08-19. Pixel matching proves the chapter stacking sequence and source-space
   offsets; the separate beige foreground vector owns the ROOT upper edge. Normalized
   production derivatives and final page-placement evidence are still pending.
+
+### 2026-08-21 — the photograph reaches the browser bars
+
+- Learned that a band can be the right colour and still be the defect. Three rounds went
+  into making the strip under the iOS toolbar match the photograph's edge, and measured on
+  the device the colour was close on two chapters out of four. What none of them changed is
+  that the strip had **no texture**: 58.0 CSS px on all four chapters, per-row luma standard
+  deviation 0.1 against 11.3–15.1 in the photograph a single raster row above it. The
+  toolbar composites roughly 0.72 of the page over a dark base, uniformly down the strip, so
+  a photograph put there would be seen. There was not one. Colour was never the question.
+- Accepted that this costs a second copy of the photograph. A `position: fixed` box is
+  clipped to the window and cannot reach those strips, so the layer that answers them has to
+  be ordinary document content — and ordinary document content scrolls. Holding it still
+  from a frame loop trails the compositor by 69–225 px under a flick, measured on the
+  device. A scroll-driven CSS animation held it to 0.05–0.64 px through inertial scrolling
+  at roughly 9 000 px/s. That is the whole argument for the mirror.
+- Built the diagnostic before the fix, and it paid for itself three times over. A ternary
+  de Bruijn carrier makes every recorded frame locate itself absolutely, which is what stops
+  a 13 px lag being read as +1 px by a periodic pattern. Reading it back caught three
+  defects that would all have shipped: a counter-translated layer extends the document in
+  Chromium unless its band carries `overflow: clip`, and then feeds its own scale error;
+  two `vh` terms that cancel algebraically still round separately and leave 0.22 px behind;
+  and endpoints left stale across an address-bar collapse put an error of **0.75 % of the
+  scroll offset** into the pin — 11.8 px at scrollY 1817, 28.5 px at 3916. That last one is
+  the shape a defect should never be allowed to have: invisible where you look first, and
+  compounding all the way down.
+- Wrote the acceptance rules before the recording existed, and then had to replace one of
+  them. The rule that picked which columns of a bar strip to read was a fixed chroma
+  threshold, and it rejected **every column in both strips** — the carrier's own shade
+  stripe is near-neutral by design and the bar's wash finishes the job. That is a rule that
+  is wrong in principle, not mis-tuned: at that setting no measurement existed to gate. It
+  was replaced with a self-calibrating one (agreement with the per-row median) that uses no
+  absolute colour value. Worth separating the two cases: a threshold changed because the
+  result was disappointing is cheating; a rule replaced because it cannot measure anything
+  at all is not.
+- Chose travel over crop when the two could not both be had. The approved SP derivative is
+  927.7 CSS px tall against an 874 px screen, so covering both strips leaves 53.7 px of
+  travel instead of 213.7, and the frame has to start about a status bar above the window.
+  DA-MEDIA-01 asks for a photograph that does not scroll, so the reduced travel moves toward
+  the annotation rather than away from it — but the shifted crop origin is a real deviation
+  on the compact composition and is on record as one, with new derivatives as the way out.
+- Left the top edge `UNVERIFIED` rather than rounding it up. The top strip is 63 CSS px, its
+  material is nearly opaque at the very top, and the correlation peak there was separated
+  from its nearest rival by as little as 0.015. The bottom strip — where every reported
+  symptom is — measured cleanly. Saying so is cheaper than a number nobody should trust.
+
+### 2026-08-21 — two defects the tests could not see
+
+- Custom properties inherit down, not sideways. The chapter photograph's travel was written
+  onto the plate's `<img>`, which is exactly where it belongs when there is one image. There
+  are now two, in sibling subtrees, and the second silently used the fallback. The
+  photograph stepped 25–55 CSS px at the window edge and the step changed with the scroll,
+  so it read as "something is off when it moves" rather than as a static seam. Anything two
+  elements must agree on belongs on the ancestor they share, and the declaration that used
+  to sit on one of them will shadow it if left behind.
+- Writing a keyframe is not the same as the compositor having used it. WebKit left the
+  mirrors up to 2 681 CSS px from their pinned position for the first frames after load,
+  where Chromium applied them at once; the reveal was gated on the geometry being *written*,
+  which is a fact about our code rather than about the screen. It is now gated on the
+  layer's measured position. Gating it on `display` deadlocked — a box that is not displayed
+  has no box to measure — which is its own small lesson about writing a gate whose test
+  destroys the thing being tested.
+- Both defects were found by reproducing the owner's report under control rather than by
+  measuring the recording. Two hours of forensic analysis of the video produced nothing
+  decisive: the browser bar's own wash makes the region low in information, and every
+  correlation there fits many offsets. Ninety seconds of driving the same page locally with
+  `screen.height` overridden to the device's own value produced both. When a symptom can be
+  reproduced, reproduce it; a recording is evidence of last resort, not of first.
+- Do not build a safety margin on a value a known browser bug can zero. How far above the
+  window the photograph has to start was read from `env(safe-area-inset-top)`, which is the
+  right signal and is also the subject of an open WebKit bug that returns 0. The failure it
+  produced was the original defect coming back at the other edge, silently, on exactly the
+  devices with the bug. The estimate now has a floor under it.
+- An independent review of the same evidence found a frame the measurement had not: a flat
+  band 66.7 CSS px tall that was neither of the two defects already fixed. Worth the cost of
+  asking. The right response to "here is a frame you did not look at" is to measure that
+  frame, not to explain why the earlier measurement was still sound.

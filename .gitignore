@@ -66,3 +66,13 @@
 Thumbs.db
 .idea/
 .vscode/
+
+# Device evidence and screen recordings dropped at the repository root. They are client
+# material and private diagnostic captures: `vercel deploy` uploads the working directory,
+# so without these five lines an ordinary deploy publishes them. Production imagery lives
+# under `public/`, so nothing legitimate matches at the root.
+/*.jpeg
+/*.jpg
+/*.png
+/*.mp4
+/*.mov

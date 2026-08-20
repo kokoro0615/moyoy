@@ -111,6 +111,95 @@ document height as before.
   which removes the `loading` attribute before the chapter can reach the viewport.
 - LCP is the hero vector/type, so the initial request set is unchanged.
 
+### 4.1 The browser-bar mirror (2026-08-21)
+
+iOS Safari draws its status bar and toolbar translucently over the page, and what shows
+through is the DOCUMENT's own scrolled paint. A `position: fixed` box is clipped to the
+window and never reaches those strips, so the pinned plate cannot fill them. Measured on
+four device screenshots of the previous build, every photo chapter therefore carried a band
+of **58.0 CSS px** under the toolbar whose per-row luma standard deviation was **0.1**
+against **11.3–15.1** in the photograph immediately above it: not a colour that was slightly
+wrong, a surface with no texture at all. Modelling the toolbar as `alpha x content + base`
+and solving it from two chapters gives `alpha ~ 0.72` over a dark base, uniform down the
+strip — a photograph placed there would be plainly visible. There simply was not one.
+
+The chapter therefore carries the photograph twice:
+
+```
+.chapter                        absolute, artboard coordinates
+└ .chapter-photo                silhouette mask + clip-path + overflow: clip
+  ├ .chapter-photo-bleed        the previous mean-edge fill, kept as the fallback
+  ├ .chapter-photo-mirror       ordinary document content, counter-pinned by CSS
+  │  └ .chapter-photo-mirror-frame
+  │     └ picture > img         the same file, the same crop, the same pan
+  └ .chapter-photo-pin          position: fixed — unchanged
+     └ picture > img
+```
+
+`.chapter-photo-mirror` is `position: absolute`, so it is document content and the strips
+receive it, and it is held still by `animation-timeline: scroll(root block)` rather than by
+a frame loop, so it cannot fall behind the compositor. The endpoints are
+
+```
+from = (-BLEED - chapterDocumentTop) / artboardScale
+to   = (maximumScroll - BLEED - chapterDocumentTop) / artboardScale
+```
+
+which makes the translation `scrollY - BLEED - chapterDocumentTop` at every offset.
+
+Four properties are load-bearing and none is guessable:
+
+1. **The endpoints come from the chapter's measured document top,** not from a CSS
+   expression meant to cancel one. Two `vh` terms that cancel algebraically still round
+   separately during layout; measured on the diagnostic, the residual was 0.22 CSS px.
+2. **They are re-derived whenever the window height changes.** When the address bar
+   collapses the window grows by 40 px out of about 5 300, and a mirror still scaled against
+   the old range acquires an error of **0.75 % of the scroll offset** — measured at 11.8 px
+   at `scrollY 1817` and 28.5 px at 3916. Under 2 px near the top of the document and
+   compounding all the way down it. `resize` alone did not catch it on the device; the
+   controller also listens to `visualViewport` and compares `innerHeight` each frame.
+3. **`overflow: clip` on `.chapter-photo`.** `clip-path` alone does not stop a
+   counter-translated descendant contributing to scrollable overflow: measured in Chromium,
+   `scrollHeight` grew from 6752 to 6940 px once the translation passed the document's end,
+   which changed the maximum scroll the endpoints are derived from, which moved the mirror,
+   which grew the document again.
+4. **The pin and the photograph's own travel are separate elements.** One element cannot
+   carry both transforms without one overwriting the other.
+
+Everything is gated behind
+`@supports (animation-timeline: scroll(root block)) and (animation-duration: auto)` and on
+the geometry having been measured (`[data-mirror="ready"]`). Where either is missing the
+mirror is never displayed and the page is exactly the page that shipped before it. Firefox
+153 has neither, and an ungated animation there ran on the document timeline instead,
+finished in a second and held the far keyframe forever — the mirror a whole document away
+from where it belongs.
+
+Device evidence, iPhone at 402 x 714, against a screen-fixed reference in the same frame:
+the layer held between **0.05 and 0.64 CSS px** through inertial scrolling at roughly
+9 000 px/s. The same page driven from a `scroll` + rAF loop was 69 to 225 px out. The top
+edge could not be measured from that recording and remains `UNVERIFIED`.
+
+### 4.2 Travel, and what it costs (deviation)
+
+The photograph cannot both traverse its whole hidden remainder and reach past both window
+edges. Measured on the device: the SP derivative renders **927.7 CSS px** tall against an
+**874 px** screen, so **53.7 px** is spare once the screen is covered, against **213.7 px**
+of travel if only the 714 px window has to be covered.
+
+Two consequences, both recorded as intentional deviations, both specific to the compact
+composition and neither affecting the desktop acceptance criterion at 1440 x 900:
+
+- **Travel is reduced** to `imageHeight - screenHeight - 8` where the browser draws bars.
+  DA-MEDIA-01 asks for a photograph that does not scroll, so less travel is the more
+  faithful direction, and the previous specification already described mobile as
+  "effectively a pure pin".
+- **The frame starts above the window** rather than level with it, by roughly the status
+  bar's own height. A photograph whose top edge is at the window's top edge cannot appear
+  above that edge; this shift is unavoidable with the current derivatives.
+
+Both disappear if derivatives carrying vertical context beyond the approved silhouette are
+ever produced (open question Q-23).
+
 ## 5. Contour parallax (DA-MOTION-02) and relative object offset (DA-MOTION-01)
 
 Each approved contour drawing is a single Illustrator export containing separate contour

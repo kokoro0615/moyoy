@@ -553,7 +553,24 @@ main[data-page="moyoy-lp"] {
      composited layer, and — unlike `transform`, `filter` or `contain: paint` — it does
      not become the containing block for a fixed descendant, so the pin below stays
      viewport-fixed. Verified in WebKit and Chromium at 390 and 1440. */
+  /* The photograph's own travel. It is declared HERE, on the chapter, because two separate
+     images read it — the plate's and the browser-bar mirror's — and they must read the same
+     value. Custom properties inherit down, not sideways: written on the plate's image it
+     reached the plate alone, the mirror fell back to `0%`, and the photograph then jumped by
+     25 to 55 CSS px at the window edge, by an amount that changed as the page scrolled.
+     Measured in WebKit at 402 x 714 before the move. */
+  --chapter-pan-y: 0%;
+
   clip-path: inset(0);
+  /* `clip-path` alone does not stop the counter-pinned mirror below from contributing to
+     scrollable overflow. Measured in Chromium on the diagnostic: once the mirror's
+     translation carried it past the document's end, `scrollHeight` grew from 6752 to
+     6940 px, which changed the maximum scroll the mirror's own keyframes are derived
+     from, which moved the mirror, which grew the document again. WebKit's `clip-path`
+     suppressed it and Chromium's did not; `overflow: clip` stops it in both, and unlike
+     `transform` or `contain: paint` it does not become the containing block for the
+     viewport-fixed plate inside. */
+  overflow: clip;
   /* The undecoded-frame fallback lives here, on an absolutely positioned box, rather
      than on the fixed plate inside. Visually the two are the same — the mask confines
      both to the silhouette — but Safari 26 derives its toolbar tint from the
@@ -609,6 +626,110 @@ main[data-page="moyoy-lp"] {
     var(--chapter-edge-bottom, var(--chapter-tone, var(--ink)));
   pointer-events: none;
   transform: translate3d(0, var(--chapter-window-y, 0px), 0);
+}
+
+/* The photograph, again, as ordinary document content — the only kind of layer that
+   reaches the strips iOS Safari draws its bars over.
+
+   The fill above gets the colour of the frame's edge into those strips, and measured on
+   the device it does that reasonably well. What it cannot do is carry the frame's
+   TEXTURE: on all four chapters the band under the toolbar is 58.0 CSS px of perfectly
+   flat colour, its per-row standard deviation collapsing from 11-15 in the photograph to
+   0.1 in the band across a single raster row. The toolbar is not blurring the page enough
+   to hide a photograph — it composites roughly 0.72 of the page over a dark base, uniformly
+   down the strip — so a photograph placed there would be seen. There simply is not one.
+
+   This is that photograph. It is `position: absolute`, so it is document content and the
+   strips receive it; it is held still by a scroll-driven CSS animation rather than by a
+   frame loop, so it does not fall behind the compositor the way a `scroll` + rAF pin does.
+   Measured on an iPhone at 402 x 714, against a screen-fixed reference in the same frame:
+   the layer held to between 0.05 and 0.64 CSS px through inertial scrolling at roughly
+   9 000 px/s, where the same page driven from a frame loop was 69 to 225 px out.
+
+   Two properties of the keyframes are load-bearing and neither is guessable:
+
+   - both endpoints are derived from the chapter's own MEASURED document top, not from a
+     CSS expression that is supposed to cancel one. Two `vh` terms that cancel
+     algebraically still round separately during layout, and on the diagnostic the residual
+     was 0.22 CSS px.
+   - they are re-derived whenever the browser UI changes the window height. Measured: when
+     the address bar collapses the window grows by 40 px out of about 5 300, and a mirror
+     still scaled against the old range acquires an error of 0.75 % OF THE SCROLL OFFSET —
+     11.8 px at scrollY 1817, 28.5 px at 3916. Invisible at the top of the page and
+     compounding downwards, which is the most misleading shape such a defect can have.
+
+   The whole thing is a progressive enhancement. Where scroll timelines are absent the rule
+   never applies, the mirror is never displayed, and the page is exactly the page that
+   shipped before it — the fill above, and nothing else. */
+.chapter-photo-mirror {
+  display: none;
+}
+
+@supports (animation-timeline: scroll(root block)) and (animation-duration: auto) {
+  .chapter-photo-mirror {
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: var(--chapter-mirror-height, 0px);
+    animation-name: chapter-mirror-pin;
+    animation-duration: auto;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: scroll(root block);
+    pointer-events: none;
+  }
+
+  /* Hidden until the scroll owner has confirmed the layer is actually where it belongs — a
+     mirror shown at the wrong offset would slide the photograph through the bar, which is
+     worse than the flat fill it replaces. `visibility` rather than `display`, because the
+     confirmation reads the element's own box and a `display: none` box has none: gating on
+     `display` deadlocks, the mirror never measurable and so never revealed. */
+  .chapter-photo-mirror {
+    display: block;
+    visibility: hidden;
+  }
+
+  .chapter-photo-mirror[data-mirror="ready"] {
+    visibility: visible;
+  }
+}
+
+@keyframes chapter-mirror-pin {
+  from {
+    transform: translate3d(0, var(--chapter-mirror-from, 0px), 0);
+  }
+
+  to {
+    transform: translate3d(0, var(--chapter-mirror-to, 0px), 0);
+  }
+}
+
+/* The pin and the photograph's own travel are separate elements on purpose: one element
+   cannot carry both transforms without one overwriting the other. This frame is the
+   window, offset inside the mirror by the bleed, and it does not clip — the whole point is
+   that the photograph continues past its edges into the strips. */
+.chapter-photo-mirror-frame {
+  position: absolute;
+  top: var(--chapter-mirror-inset, 0px);
+  right: 0;
+  left: 0;
+  height: var(--chapter-window, 0px);
+}
+
+.chapter-photo-mirror picture {
+  display: contents;
+}
+
+.chapter-photo-mirror img {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  transform: translate3d(0, var(--chapter-pan-y, 0%), 0);
 }
 
 /* DA-MEDIA-01 「背景写真は固定（スクロールしない）」. A real viewport-fixed plate, the
@@ -708,8 +829,6 @@ main[data-page="moyoy-lp"] {
    0.4 px per scrolled pixel, so a frame of main-thread latency is imperceptible — unlike
    the 1 : 1 counter-scroll it replaces. */
 .chapter-photo-pin img {
-  --chapter-pan-y: 0%;
-
   display: block;
   width: 100%;
   height: auto;
@@ -1846,6 +1965,13 @@ footer[data-fidelity="footer"] {
     position: absolute;
     inset: 0;
     overflow: clip;
+  }
+
+  /* Released from the window, each chapter shows its whole photograph in ordinary flow,
+     so there are no browser-bar strips left to answer and the mirror would only be a
+     second copy of the same frame. */
+  .chapter-photo-mirror {
+    display: none !important;
   }
 
   .chapter-photo-pin img {

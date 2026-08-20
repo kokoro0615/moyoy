@@ -96,10 +96,18 @@ constrain intent; its four guide records are measurement aids only.
 - Chapter photography must never move a chapter boundary. The silhouette stays pinned as
   a static `mask-image`; the photograph inside it is sized to the viewport and translated
   by the whole scrolled distance so it holds still on screen (DA-MEDIA-01
-  「背景写真は固定（スクロールしない）」). The strip this opens above the photograph is always
-  the part already scrolled past, so it can never become visible. `position: fixed` cannot
-  be used here: the desktop artboard is transformed, which would make a fixed element
-  resolve against the artboard instead of the viewport.
+  「背景写真は固定（スクロールしない）」). **Superseded 2026-08-20:** the artboard resolves its
+  canvas with `zoom` rather than `transform: scale()`, so it is no longer the containing
+  block for a fixed descendant and the pin is a real `position: fixed` plate owned by the
+  browser. `.chapter-photo-pin` must stay `position: fixed` under normal motion.
+- The chapter also carries the photograph a second time as ordinary document content
+  (`.chapter-photo-mirror`), because iOS Safari's translucent bars show the document's own
+  scrolled paint and a fixed box is clipped to the window. That mirror is held still by a
+  scroll-driven CSS animation, never by a frame loop; its keyframe endpoints are derived
+  from the chapter's measured document top and re-derived whenever the window height
+  changes; and it is a progressive enhancement that is never displayed where scroll
+  timelines are absent or the geometry has not been measured. It contributes no second
+  image to the accessibility tree.
 - Every chapter photograph is full bleed: its box starts at x = 0 and spans the whole
   viewport width at 390, 768, 1200, 1440 and 2560.
 - Motion cannot own content visibility or block reading/navigation.

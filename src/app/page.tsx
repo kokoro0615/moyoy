@@ -50,6 +50,56 @@ function ContourStack({
   );
 }
 
+/**
+ * The chapter photograph's responsive sources, in one place.
+ *
+ * The plate and the browser-bar mirror have to resolve to the SAME file at every width:
+ * the mirror continues the plate's own frame past the window edge, and two `<picture>`
+ * elements that could ever select different derivatives would put a seam in the middle of
+ * a photograph. `decorative` gives the mirror an empty alt and hides it from assistive
+ * technology, so the chapter still contributes exactly one image to the accessibility
+ * tree. The loading attributes are identical, so the mirror shares the plate's request
+ * rather than adding one.
+ */
+function ChapterPhoto({
+  chapter,
+  decorative,
+  eager,
+}: Readonly<{
+  chapter: (typeof chapters)[number];
+  decorative?: boolean;
+  eager: boolean;
+}>) {
+  return (
+    <picture>
+      <source
+        height={chapter.spHeight}
+        media="(max-width: 639px)"
+        srcSet={`${assetRoot}/photo/sp-${chapter.id}.webp`}
+        width={chapter.spWidth}
+      />
+      <source
+        height={chapter.wideHeight}
+        media="(min-width: 2401px)"
+        srcSet={`${assetRoot}/photo/pc-2560-${chapter.id}.webp 2560w`}
+        width="2560"
+      />
+      <img
+        alt={decorative ? "" : chapter.alt}
+        aria-hidden={decorative ? "true" : undefined}
+        decoding="async"
+        fetchPriority="low"
+        height={chapter.pcHeight}
+        loading={eager ? "eager" : "lazy"}
+        src={`${assetRoot}/photo/pc-${chapter.id}.webp`}
+        sizes="100vw"
+        srcSet={`${assetRoot}/photo/pc-${chapter.id}.webp 1200w, ${assetRoot}/photo/pc-1440-${chapter.id}.webp 1440w, ${assetRoot}/photo/pc-2400-${chapter.id}.webp 2400w`}
+        width="2400"
+      />
+    </picture>
+  );
+}
+
 export default function MoyoyPage() {
   return (
     <SiteMenu>
@@ -162,35 +212,20 @@ export default function MoyoyPage() {
                       photograph instead of banding it. The plate covers it everywhere the
                       reader can actually look. */}
                   <div aria-hidden="true" className="chapter-photo-bleed" />
+                  {/* The same photograph as ordinary document content, which is the only
+                      kind of layer that reaches the strips iOS Safari draws its bars over.
+                      The plate below covers it everywhere the reader can actually look, so
+                      it is only ever seen through a browser bar. */}
+                  <div aria-hidden="true" className="chapter-photo-mirror">
+                    <div className="chapter-photo-mirror-frame">
+                      <ChapterPhoto chapter={chapter} decorative eager={index === 0} />
+                    </div>
+                  </div>
                   <div className="chapter-photo-pin">
                     {/* Each source carries its own intrinsic box: the SP and 2560 crops
                         do not share the default aspect ratio, so without them the plate
                         would size the frame wrongly until the file decodes. */}
-                    <picture>
-                      <source
-                        height={chapter.spHeight}
-                        media="(max-width: 639px)"
-                        srcSet={`${assetRoot}/photo/sp-${chapter.id}.webp`}
-                        width={chapter.spWidth}
-                      />
-                      <source
-                        height={chapter.wideHeight}
-                        media="(min-width: 2401px)"
-                        srcSet={`${assetRoot}/photo/pc-2560-${chapter.id}.webp 2560w`}
-                        width="2560"
-                      />
-                      <img
-                        alt={chapter.alt}
-                        decoding="async"
-                        fetchPriority="low"
-                        height={chapter.pcHeight}
-                        loading={index === 0 ? "eager" : "lazy"}
-                        src={`${assetRoot}/photo/pc-${chapter.id}.webp`}
-                        sizes="100vw"
-                        srcSet={`${assetRoot}/photo/pc-${chapter.id}.webp 1200w, ${assetRoot}/photo/pc-1440-${chapter.id}.webp 1440w, ${assetRoot}/photo/pc-2400-${chapter.id}.webp 2400w`}
-                        width="2400"
-                      />
-                    </picture>
+                    <ChapterPhoto chapter={chapter} eager={index === 0} />
                   </div>
                 </div>
                 <div className="chapter-copy">
