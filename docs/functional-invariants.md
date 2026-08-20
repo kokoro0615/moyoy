@@ -69,11 +69,17 @@ constrain intent; its four guide records are measurement aids only.
   non-modally (`show()`) and the modality comes from the shell `inert` plus the focus
   trap: the top layer sits above every z-index on the page, including the boxes that keep
   Safari 26 from tinting the browser bars, and the drawer reaches the sampled window edge
-  on any narrow window (VF-47). For the same reason the scroll lock fixes the application
-  shell rather than `<body>`.
-- Escape and the visible ≥44×44 close button use one idempotent close path, restore the
-  exact scroll position, remove inertness, and return focus to the invoker or stable menu
-  fallback. Backdrop click does not close; no unapproved destination/history behavior
+  on any narrow window (VF-47). The scroll lock is an input-level one and must stay that
+  way (VF-48): it cancels `touchmove`, `wheel` and the document scroll keys while the
+  drawer is open and changes no box on the page, because any layout lock either offers the
+  edge sampler a viewport-constrained ancestor or takes `.chapter-photo-mirror` out of
+  flow and stops the root scroller driving it.
+- Escape and the visible ≥44×44 close button use one idempotent close path, leave the
+  scroll position exactly where it was, remove inertness, and return focus to the invoker
+  or stable menu fallback. Focus entry and return both restate the modality of the
+  interaction that moved them (`focus({ focusVisible })`), so the focus indicator is shown
+  to keyboard readers and withheld from pointer ones on every engine rather than on the
+  engine's own heuristic (VF-49). Backdrop click does not close; no unapproved destination/history behavior
   is inferred.
 - Only approved labels with resolved behavior may be interactive. NEWS and unresolved
   shop/social/legal destinations create no focusable dead links.

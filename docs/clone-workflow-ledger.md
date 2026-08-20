@@ -409,3 +409,65 @@ of these unfixable.
 | `pnpm test:e2e` at default parallelism | **environmentally unreliable, unchanged.** One WebKit test (`the chapter plate is viewport-fixed and the photograph pans through its frame`) fails under three-engine load and passes in isolation; reproduced identically on the unmodified baseline, so it is not a property of this change |
 | WebKit / mobile-context visual baselines | still absent |
 | `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |
+
+---
+
+## 2026-08-21 second session — the drawer's scroll lock and its focus ring
+
+Owner review on a physical iPhone rejected the previous session's fix and reported a
+second defect: the band at the bottom of the screen is still there when the menu opens and
+closes (VF-48), and pressing the menu button draws a square frame around the close button
+(VF-49). Codex was consulted read-only on both, against the shipping WebKit tree.
+
+### Reference and rights
+
+Unchanged. No new asset, no new copy, no new destination. Both changes are behavioural.
+
+| Item | State |
+| --- | --- |
+| Target URL / approved scope | unchanged from the 2026-08-21 session |
+| Copy | unchanged |
+| Functional invariants touched | modal background scroll (now input-level), focus entry and return (now modality-stated) |
+
+### Assets touched
+
+None. All 21 visual baselines pass unchanged — neither defect is visible to Chromium,
+which is the engine the baselines are taken in.
+
+### Comparison performed
+
+| Check | Result |
+| --- | --- |
+| Mirror and root scroller, drawer open | WebKit + Chromium at 402 × 714 and 390 × 844: shell never `fixed`/`sticky`, root scroller keeps scrollable overflow, scroll timeline stays active, mirror box top unmoved to < 0.5 px, `scrollY` unchanged through open and close |
+| Scroll lock, 3 engines | wheel over the page, wheel over a non-scrolling drawer, `PageDown` and `End` with focus in the drawer: `scrollY` held at 1500 in all three; released with the drawer |
+| Focus ring, 3 engines | pointer open / pointer close: `:focus-visible` false on the close button and on the invoker. Keyboard open / Escape close: true on both |
+| Red check | both new tests fail against the previous implementation (WebKit) and pass against this one |
+| `pnpm test:e2e` / `test:a11y` / `test:visual` / `test:lhci` | 132 passed + 18 skipped / 5 passed / 21 passed / assertions green |
+
+### Root cause
+
+VF-48: the scroll lock, for a third time, and this one is not about the edge sampler. The
+predicate has been green in both menu states since VF-47; what the lock also does is take
+the page out of flow, and the page now carries `.chapter-photo-mirror`, which needs to be
+ordinary document content driven by the root scroller. `position: fixed` on the shell
+breaks both halves: a fixed subtree is clipped to the window, so the mirror cannot reach
+the strips the bars are drawn over, and an out-of-flow page leaves the root scroller with
+no scrollable overflow, which makes the `scroll(root block)` timeline inactive and drops
+the mirror to `transform: none` — measured at 633 px out of place. The lock is now
+input-level and changes no box on the page.
+
+VF-49: `dialog.show()` runs HTML's dialog focusing steps and lands on the close button
+carrying no `FocusOptions`, and WebKit matches `:focus-visible` on a programmatic focus
+whatever the reader did. Codex traced the workaround that should have prevented it —
+`EventHandler::setLatestFocusTrigger` — to a version that only inspects the innermost hit
+element, which this page's opener defeats by wrapping its mark in nested `span`s. The
+modality is now read off the click's `detail` and restated with `focus({ focusVisible })`
+in both directions.
+
+### Still unresolved after this session
+
+| Item | State |
+| --- | --- |
+| VF-48 and VF-49 on the owner's device | measured on three engines under Playwright, which is not iOS Safari; **a device re-check is required to close either** |
+| Q-23b, PC menu label size (Q-28) | unchanged |
+| `pnpm test:fidelity` / `pnpm candidate:preflight` | **BLOCKED, pre-existing and unchanged** |

@@ -115,24 +115,22 @@ body {
   background: var(--paper);
 }
 
-/* VF-47. The drawer's scroll lock, applied to the app shell rather than to `<body>`.
-   A fixed `<body>` is a window-sized `position: fixed` box, which is precisely what Safari
-   26's edge sampler accepts: `.chrome-shield` still takes the hit and still fails as
-   `TooSmall`, but `fixedContainerEdges()` then walks the lineage of the box it hit, and
-   with the lock on `<body>` that walk reached the body and accepted it — filling both
-   browser bars with the paper `background-color` for as long as the menu was open.
-   Measured against the source predicate at 320, 390 and 768: the candidate at both edges
-   was `body.menu-locked`. The shields are siblings of the shell, so with the lock here
-   their lineage is `body` → `html`, neither of which is viewport-constrained.
+/* VF-48. There is no layout-level scroll lock here, and there must not be one.
 
-   A `position: fixed` ancestor does not become the containing block for a fixed
-   descendant — only transform, filter, perspective, `contain` and `will-change` do — so
-   the chapter plates inside the shell stay pinned to the window exactly as before. */
-[data-app-shell][data-scroll-locked] {
-  position: fixed;
-  inset-inline: 0;
-  width: 100%;
-}
+   Two locks have been tried and both put a band back into the browser bars. `<body>`
+   fixed (VF-47) made the body a window-sized viewport-constrained box, which Safari 26's
+   edge sampler accepts as a candidate once `.chrome-shield` has failed and the lineage
+   walk reaches it. Moving the same rule onto `[data-app-shell]` cleared that, but a fixed
+   subtree is clipped to the window, so `.chapter-photo-mirror` stopped reaching the
+   strips the bars are drawn over — and taking the page out of flow also empties the root
+   scroller, which makes the `scroll(root block)` timeline that holds the mirror still
+   inactive, dropping it to `transform: none`.
+
+   The generalised rule, and the reason this comment is here rather than a declaration:
+   **nothing may make an ancestor of `.chrome-shield` or of `.chapter-photo-mirror`
+   `position: fixed` or `sticky`, and nothing may take scrollable overflow away from the
+   root scroller.** The lock is in `site-menu.tsx` instead, where it cancels the scrolling
+   input and touches no box on the page. See docs/ios26-tint-root-cause.md §9. */
 
 button,
 input,
@@ -1227,6 +1225,10 @@ footer[data-fidelity="footer"] {
   margin: 0;
   padding: 0;
   overflow: auto;
+  /* The other half of VF-48's input-level scroll lock: the drawer keeps its own scroll,
+     and a gesture that runs past either end of it stops there instead of chaining out to
+     the page underneath. */
+  overscroll-behavior: contain;
   border: 0;
   color: #fff;
   background: var(--olive-aa);

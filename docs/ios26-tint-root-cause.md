@@ -405,13 +405,32 @@ Device checks:
      The lock is now on `[data-app-shell]`, which the shields are siblings of, so their
      lineage is `body` → `html` and neither is viewport-constrained.
 
-  This is the more useful shape of the finding: **any rule that makes an ancestor of the
-  shield `position: fixed` or `sticky` defeats it**, however far from the window edge that
-  ancestor's own purpose is. The e2e check covers both states — see
+  3. **And the lock was still wrong after that, for a reason that has nothing to do with
+     the sampler (VF-48).** With the lock on `[data-app-shell]` the predicate was green in
+     both menu states on three engines and the band was still reported from the device.
+     By then the page carried `.chapter-photo-mirror`, and the mirror does not depend on
+     the sampler finding nothing — it depends on being *ordinary document content driven
+     by the root scroller*. `position: fixed` on the shell breaks both halves of that at
+     once: a fixed subtree is clipped to the window, so the mirror stops reaching the
+     strips; and a page taken out of flow leaves the root scroller with no scrollable
+     overflow, which makes the `scroll(root block)` timeline **inactive**, so the
+     animation produces no value and the mirror falls back to `transform: none`. Measured
+     in WebKit at 390 x 844, scrolled to 2200, drawer open: `scrollHeight` 6637 → 844,
+     timeline `currentTime` 37.98 % → `null`, mirror transform `translateY(-608.39px)` →
+     `none`, mirror box top −240 px → +393 px. The lock is now an input-level one and
+     changes no box on the page; see `site-menu.tsx`.
+
+  This is the more useful shape of the finding, and it is now two rules rather than one:
+  **nothing may make an ancestor of the shield `position: fixed` or `sticky`** — however
+  far from the window edge that ancestor's own purpose is — **and nothing may take
+  scrollable overflow away from the root scroller or take the page out of flow**, because
+  the mirror needs both. The e2e checks cover both states — see
   `tests/e2e/release-boundary.spec.ts`, "offers Safari no colour for either browser bar"
-  and "…with the menu open" — and asserts `:modal` is false as the half a hit test cannot
-  observe. At 1440 px the drawer never reached the midpoint, so neither defect was visible
-  on the desk; both were reported from a phone.
+  and "…with the menu open", which assert `:modal` is false as the half a hit test cannot
+  observe, and `tests/e2e/production.spec.ts`, "the drawer's scroll lock leaves the mirror
+  and the root scroller alone", which asserts the half the predicate cannot see. At
+  1440 px the drawer never reached the midpoint, so none of these was visible on the desk;
+  all three were reported from a phone.
 - **Landscape.** `sidesRequiringFixedContainerEdges` adds `Left`/`Right` when those obscured
   insets are non-zero. The shields sit at the top and bottom midpoints, so a side edge would
   still be answered by the plate. Untested.

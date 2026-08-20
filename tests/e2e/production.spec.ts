@@ -1157,3 +1157,183 @@ test("the browser-bar mirror is document content, holds still, and adds nothing 
       .toBe("none");
   }
 });
+
+test("the drawer's scroll lock leaves the mirror and the root scroller alone", async ({
+  browserName,
+  page,
+}) => {
+  // VF-48. The regression this covers was invisible to every other check in this file: the
+  // drawer's geometry, focus trap, Escape path and scroll restoration were all correct, and
+  // the edge-candidate predicate was green in both menu states. What the lock did instead
+  // was take the page out of flow — which clips it to the window, so `.chapter-photo-mirror`
+  // can no longer reach the strips iOS Safari draws its bars over — and empty the root
+  // scroller, which makes the `scroll(root block)` timeline that holds the mirror still go
+  // inactive and drop it to `transform: none`. Neither is observable from a bar colour, so
+  // this asserts the two properties the mirror needs the lock to preserve.
+  await page.setViewportSize({ height: 714, width: 402 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/", { waitUntil: "networkidle" });
+
+  const supported = await page.evaluate(
+    () =>
+      CSS.supports("animation-timeline", "scroll(root block)") &&
+      CSS.supports("animation-duration", "auto"),
+  );
+  test.skip(!supported, `no scroll timeline in ${browserName}, so there is no mirror`);
+
+  await page.evaluate(() => window.scrollTo(0, 2600));
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (document.querySelector("#root .chapter-photo-mirror") as HTMLElement)
+              .dataset.mirror ?? "",
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe("ready");
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Math.abs(
+          (
+            document.querySelector("#root .chapter-photo-mirror") as HTMLElement
+          ).getBoundingClientRect().top + 240,
+        ),
+      ),
+    )
+    .toBeLessThan(0.5);
+
+  const readLockState = () =>
+    page.evaluate(() => {
+      const scroller = document.scrollingElement as Element;
+      const mirror = document.querySelector(
+        "#root .chapter-photo-mirror",
+      ) as HTMLElement;
+      const shell = document.querySelector("[data-app-shell]") as HTMLElement;
+      return {
+        mirrorTop: mirror.getBoundingClientRect().top,
+        // Null once the timeline has no scrollable overflow to run against.
+        pinDrivesTheMirror: mirror
+          .getAnimations()
+          .every((animation) => animation.timeline?.currentTime !== null),
+        scrollY: window.scrollY,
+        scrollable: scroller.scrollHeight > scroller.clientHeight,
+        shellPosition: getComputedStyle(shell).position,
+      };
+    });
+
+  const before = await readLockState();
+  expect(
+    before.scrollable,
+    "the root scroller has scroll before the drawer opens",
+  ).toBe(true);
+
+  await page.locator("button[data-fidelity-action='open-menu']").click();
+  await settleMenu(page);
+  const open = await readLockState();
+
+  expect(
+    open.shellPosition,
+    "the page stays in flow while the drawer is open",
+  ).not.toBe("fixed");
+  expect(open.shellPosition).not.toBe("sticky");
+  expect(open.scrollable, "the root scroller keeps its scrollable overflow").toBe(true);
+  expect(open.pinDrivesTheMirror, "the mirror's scroll timeline stays active").toBe(
+    true,
+  );
+  expect(open.scrollY, "the reader keeps their place").toBe(before.scrollY);
+  expect(open.mirrorTop, "the mirror does not move when the drawer opens").toBeCloseTo(
+    before.mirrorTop,
+    0,
+  );
+
+  await page.locator("button[data-fidelity-action='close-menu']").click();
+  await settleMenu(page);
+  const after = await readLockState();
+  expect(after.scrollY, "and keeps it afterwards").toBe(before.scrollY);
+  expect(after.mirrorTop, "and the mirror is where it was").toBeCloseTo(
+    before.mirrorTop,
+    0,
+  );
+});
+
+test("the drawer's focus ring answers the modality that opened it", async ({
+  page,
+}) => {
+  // VF-49. A programmatic `focus()` matches `:focus-visible` in WebKit whatever the reader
+  // did, so opening the drawer with a tap drew the page's 2 px focus outline as a rectangle
+  // around the close button and its label. Chromium and Firefox suppress it on their own,
+  // which is why every desk check missed it; all three are asserted so the fix cannot be
+  // read as engine-specific.
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.goto("/", { waitUntil: "networkidle" });
+
+  const ringOn = (selector: string) =>
+    page.locator(selector).evaluate((element) => element.matches(":focus-visible"));
+  const open = page.locator("button[data-fidelity-action='open-menu']");
+  const close = page.locator("button[data-fidelity-action='close-menu']");
+
+  await open.click();
+  await settleMenu(page);
+  await expect(close).toBeFocused();
+  expect(await ringOn("[data-fidelity-action='close-menu']"), "pointer open").toBe(
+    false,
+  );
+
+  await close.click();
+  await settleMenu(page);
+  await expect(open).toBeFocused();
+  expect(await ringOn("[data-fidelity-action='open-menu']"), "pointer close").toBe(
+    false,
+  );
+
+  // The ring is aimed, not removed: a keyboard reader still gets it in both directions.
+  await open.focus();
+  await page.keyboard.press("Enter");
+  await settleMenu(page);
+  await expect(close).toBeFocused();
+  expect(await ringOn("[data-fidelity-action='close-menu']"), "keyboard open").toBe(
+    true,
+  );
+
+  await page.keyboard.press("Escape");
+  await expect(open).toBeFocused();
+  expect(await ringOn("[data-fidelity-action='open-menu']"), "Escape close").toBe(true);
+});
+
+test("the drawer holds the page still without taking it out of flow", async ({
+  page,
+}) => {
+  // The behaviour the layout lock used to supply. A wheel over the page, a wheel over a
+  // drawer with no scroll of its own, and the keys that scroll a document all have to stop
+  // at the drawer — measured before the fix: the wheel was held by `overscroll-behavior`
+  // everywhere except Firefox, and `End` sent the page to the end of the document in both
+  // WebKit and Firefox.
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.evaluate(() => window.scrollTo(0, 1500));
+  const before = await page.evaluate(() => window.scrollY);
+
+  await page.locator("button[data-fidelity-action='open-menu']").click();
+  await settleMenu(page);
+
+  await page.mouse.move(80, 400);
+  await page.mouse.wheel(0, 600);
+  await page.mouse.move(320, 400);
+  await page.mouse.wheel(0, 600);
+  await page.keyboard.press("PageDown");
+  await page.keyboard.press("End");
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.scrollY), "held while open").toBe(before);
+
+  await page.keyboard.press("Escape");
+  await settleMenu(page);
+  expect(await page.evaluate(() => window.scrollY), "restored on close").toBe(before);
+
+  // And the lock is released with the drawer, not left on the document.
+  await page.mouse.move(80, 400);
+  await page.mouse.wheel(0, 600);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before);
+});

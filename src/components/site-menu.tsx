@@ -1,6 +1,6 @@
 "use client";
 
-import type { KeyboardEvent, ReactNode } from "react";
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const focusableSelector = [
@@ -12,52 +12,100 @@ const focusableSelector = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
+/**
+ * The keys that scroll a page. Space is deliberately absent: focus is always on a control
+ * inside the drawer, where Space activates it rather than scrolling, and cancelling it
+ * would stop the close button working.
+ */
+const scrollKeys = new Set([
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "End",
+  "Home",
+  "PageDown",
+  "PageUp",
+]);
+
+/**
+ * Whether the drawer has scroll of its own to give a gesture. When it does not — which is
+ * every approved viewport, the panel being shorter than the window — every scrolling input
+ * inside it belongs to the lock as much as one outside it does. `overscroll-behavior` is
+ * not enough on its own: measured in Firefox 153, a wheel over a non-scrolling drawer
+ * still chained to the page.
+ */
+function drawerCanScroll(dialog: HTMLDialogElement | null) {
+  return dialog !== null && dialog.scrollHeight > dialog.clientHeight;
+}
+
+/**
+ * VF-49. Whether the interaction that is about to move focus was a keyboard one.
+ *
+ * A click synthesised from Enter or Space on a button reports `detail === 0`; a pointer
+ * click reports 1 or more. It is the only modality signal carried by the event that moves
+ * focus, and WebKit needs one: there a programmatic `focus()` matches `:focus-visible`
+ * whatever the reader did, where Blink and Gecko suppress it after a pointer click. So
+ * tapping the menu open drew the page's `:focus-visible` rule — a 2 px outline, offset
+ * 4 px — as a rectangle around the whole close button, its `close` label included.
+ * Measured in WebKit 26.5 at 390 x 844: `:focus-visible` true on the close button after
+ * a pointer click, false on Chromium 151 and Firefox 153, which is why it was only ever
+ * seen on a phone.
+ *
+ * The ring is aimed rather than removed. `focus({ focusVisible })` states the answer
+ * explicitly, so a keyboard user still gets it on the close button and again on the
+ * invoker when focus returns, and tabbing to either afterwards restores it as usual.
+ */
+function wasActivatedByKeyboard(event: MouseEvent<HTMLButtonElement>) {
+  return event.detail === 0;
+}
+
 export function SiteMenu({ children }: Readonly<{ children: ReactNode }>) {
   const appShellRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const invokerRef = useRef<HTMLButtonElement>(null);
   const previousInertRef = useRef(false);
-  const scrollYRef = useRef(0);
   const [isOpen, setIsOpen] = useState(false);
 
-  const restorePage = useCallback(function restorePage() {
+  const restoreShell = useCallback(function restoreShell() {
     const shell = appShellRef.current;
-    if (shell) {
-      delete shell.dataset.scrollLocked;
-      shell.style.removeProperty("top");
-      if (!previousInertRef.current) shell.removeAttribute("inert");
-    }
-    window.scrollTo(0, scrollYRef.current);
+    if (shell && !previousInertRef.current) shell.removeAttribute("inert");
   }, []);
 
-  function closeMenu() {
+  function closeMenu(focusVisible: boolean) {
     const dialog = dialogRef.current;
     if (!dialog?.open) return;
     dialog.close();
     dialog.dataset.state = "closed";
-    restorePage();
+    restoreShell();
     setIsOpen(false);
-    requestAnimationFrame(() => invokerRef.current?.focus({ preventScroll: true }));
+    requestAnimationFrame(() =>
+      invokerRef.current?.focus({ focusVisible, preventScroll: true }),
+    );
   }
 
-  function openMenu() {
+  function openMenu(event: MouseEvent<HTMLButtonElement>) {
     const dialog = dialogRef.current;
     const shell = appShellRef.current;
     if (!dialog || !shell || dialog.open) return;
-    scrollYRef.current = window.scrollY;
     previousInertRef.current = shell.hasAttribute("inert");
     shell.setAttribute("inert", "");
-    // The lock is on the shell, not on `<body>`: a fixed `<body>` is a window-sized fixed
-    // box and Safari 26 fills both browser bars from it. See `[data-scroll-locked]` in
-    // globals.css.
-    shell.style.top = `-${scrollYRef.current}px`;
-    shell.dataset.scrollLocked = "";
     // `show()`, not `showModal()`: see the comment on the `<dialog>` below.
     dialog.show();
     dialog.dataset.state = "open";
     setIsOpen(true);
-    requestAnimationFrame(() => closeButtonRef.current?.focus());
+    // `show()` runs HTML's dialog focusing steps itself and lands on the close button —
+    // the drawer's first focusable descendant — so this is not what puts focus there.
+    // What it does is restate the modality of that focus, which arrived carrying no
+    // `FocusOptions` at all. `focus()` on an already-focused element is a no-op, so the
+    // `blur()` is what makes the second call take effect.
+    const closeButton = closeButtonRef.current;
+    closeButton?.blur();
+    closeButton?.focus({
+      focusVisible: wasActivatedByKeyboard(event),
+      preventScroll: true,
+    });
   }
 
   function onDialogKeyDown(event: KeyboardEvent<HTMLDialogElement>) {
@@ -66,7 +114,14 @@ export function SiteMenu({ children }: Readonly<{ children: ReactNode }>) {
     // always reaches this handler.
     if (event.key === "Escape") {
       event.preventDefault();
-      closeMenu();
+      closeMenu(true);
+      return;
+    }
+    if (scrollKeys.has(event.key) && !drawerCanScroll(event.currentTarget)) {
+      // The other half of VF-48's lock. `overscroll-behavior` governs gestures, not keys:
+      // measured in WebKit 26.5 and Firefox 153, End with focus in the drawer sent the page
+      // behind it to the bottom of the document.
+      event.preventDefault();
       return;
     }
     if (event.key !== "Tab") return;
@@ -89,14 +144,52 @@ export function SiteMenu({ children }: Readonly<{ children: ReactNode }>) {
     }
   }
 
+  /* VF-48. The page behind the drawer must not scroll while it is open, and on this page
+     that lock cannot be a layout one.
+
+     The previous lock made `[data-app-shell]` `position: fixed`, and that costs two things
+     at once on iOS 26. A fixed subtree is clipped to the window, so `.chapter-photo-mirror`
+     — the ordinary document content that reaches the strips Safari draws its translucent
+     bars over — stops reaching them. And taking the page out of flow empties the root
+     scroller, which makes the `scroll(root block)` timeline that holds the mirror still
+     *inactive*: the animation stops producing a value and the mirror falls back to
+     `transform: none`. Measured in WebKit at 390 x 844, scrolled to 2200: the timeline's
+     `currentTime` goes null and the mirror's box top moves from -240 px to +393 px. Either
+     failure alone empties both strips, and the band the device reported after VF-47 is
+     what fills them.
+
+     So the lock refuses the *input* instead, and leaves layout, the scroll offset, the
+     scroll container and the scroll timeline exactly as they were. Nothing has to be put
+     back on close, which is also why the scroll position can no longer drift. */
+  useEffect(() => {
+    if (!isOpen) return;
+    function blockPageScroll(event: Event) {
+      // A gesture inside a drawer that has scroll of its own belongs to the drawer;
+      // `overscroll-behavior: contain` in globals.css stops it chaining out to the page
+      // when it reaches either end.
+      const dialog = dialogRef.current;
+      if (drawerCanScroll(dialog) && dialog?.contains(event.target as Node)) return;
+      event.preventDefault();
+    }
+    // Explicitly non-passive: WebKit and Blink both make a `touchmove` listener on
+    // `document` passive by default, and a passive listener cannot cancel the scroll.
+    const options = { capture: true, passive: false } as const;
+    document.addEventListener("touchmove", blockPageScroll, options);
+    document.addEventListener("wheel", blockPageScroll, options);
+    return () => {
+      document.removeEventListener("touchmove", blockPageScroll, options);
+      document.removeEventListener("wheel", blockPageScroll, options);
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     const dialog = dialogRef.current;
     return () => {
       if (!dialog?.open) return;
       dialog.close();
-      restorePage();
+      restoreShell();
     };
-  }, [restorePage]);
+  }, [restoreShell]);
 
   return (
     <>
@@ -169,7 +262,7 @@ export function SiteMenu({ children }: Readonly<{ children: ReactNode }>) {
           aria-label="メニューを閉じる"
           className="menu-close-button"
           data-fidelity-action="close-menu"
-          onClick={closeMenu}
+          onClick={(event) => closeMenu(wasActivatedByKeyboard(event))}
           ref={closeButtonRef}
           type="button"
         >
