@@ -621,12 +621,16 @@ export function PageMotion() {
     /**
      * Safari 26 no longer reads `theme-color`. It derives the tint of each browser bar
      * from the `background-color` of a `position: fixed` element at that edge of the
-     * window, falling back to the body — and a fixed element it can see, which the two
-     * `.chrome-tint` anchors were not while they were buried at `z-index: -1` under the
-     * opaque paper canvas. That is why both bars stayed paper-coloured over every
-     * photograph. The anchors are `opacity: 0` now, which is invisible to the reader and
-     * still sampled, and this points each of them at the surface its own bar is drawn
-     * over — sampled independently, so a window showing a seam no longer has to choose.
+     * window, falling back to the body — and only from one it would actually draw, which
+     * the two `.chrome-tint` anchors were not, first buried at `z-index: -1` under the
+     * opaque paper canvas and then at `opacity: 0`. Both bars stayed one colour over every
+     * photograph as a result. The anchors are opaque now; this points each of them at the
+     * surface its own bar is drawn over — sampled independently, so a window showing a seam
+     * no longer has to choose.
+     *
+     * Writing the colour here is what makes the bars follow the page: a fixed layer is not
+     * re-sampled by scrolling alone, but repainting it marks the window edges dirty and the
+     * next commit re-derives them. See docs/ios26-tint-root-cause.md.
      *
      * The colour is read out of the photograph rather than from a per-chapter constant.
      * The plate is viewport-fixed and the frame inside it pans, so the rows under a bar

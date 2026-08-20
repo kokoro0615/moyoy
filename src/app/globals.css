@@ -572,45 +572,73 @@ main[data-page="moyoy-lp"] {
 }
 
 /* Safari 26 dropped `theme-color` and derives the status bar and toolbar tint from the
-   page instead: it samples the `background-color` of a `position: fixed` or `sticky`
-   element at the window edge, and falls back to the body when it finds none. A qualifying
-   element sits within 4 px of the top or 3 px of the bottom, spans at least 80 % of the
-   width and is at least 3 px high; a transparent fixed element yields nothing and the
-   sample falls through, which is why the four full-window chapter plates — transparent,
-   with the photograph on an absolutely positioned child — are not the source. These two
-   anchors are, one per edge, so a window showing two different surfaces no longer has to
-   choose one colour for both bars.
+   page instead. `LocalFrameView::fixedContainerEdges()` hit-tests a single point per
+   window edge — the midpoint of that edge, inset 4 px — walks up from whatever it hits
+   until it finds a `position: fixed` or `sticky` box, and reads that box's declared
+   `background-color`. The box has to cover more than 90 % of the window along the sampled
+   edge and to be over 10 px on both sides of its border box, below which it reads as a
+   border and is skipped. The sample falls back to the body when nothing qualifies, which
+   is why the four full-window chapter plates — transparent, with the photograph on an
+   absolutely positioned child — are not the source. These two anchors are, one per edge,
+   so a window showing two different surfaces no longer has to choose one colour for both
+   bars.
 
-   The anchors were previously hidden at `z-index: -1`, under the opaque paper canvas.
-   That is the reason the bars stayed paper-coloured over every photograph: an anchor
-   buried below the page is not sampled. `opacity: 0` is the one state that removes an
-   element from the page for the reader and still leaves Safari reading its
-   `background-color` — the same behaviour that makes a hidden `opacity: 0` modal backdrop
-   tint the toolbar, used deliberately here. Only `display: none` stops the sampling.
+   The anchors have failed twice, each time by being invisible in a different way, and
+   neither time for the assumed reason. At `z-index: -1` they sat under the opaque paper
+   canvas and were never the box the hit test landed on. At `opacity: 0` they were that box
+   and were discarded anyway: `isHiddenOrNearlyTransparent()` rejects anything below
+   `opacity: 0.1`, and WebKit regression-tests this exact element — fixed, full width,
+   `opacity: 0`, `pointer-events: none` — under the name
+   `color-sampling-ignores-transparent-pointer-events-none-container`. The widely repeated
+   claim that only `display: none` stops the sampling is false.
+
+   So the anchor is opaque, and the colour it is painted is the mean of the surface directly
+   behind it. That is not enough on its own: the mean matches but the texture does not, and
+   measured against the approved frames a flat band is 63–127 of RGB distance per pixel from
+   the photograph it covers. It is only invisible while the browser chrome is over it
+   (60 px of status bar, 90 px of toolbar — `page-motion.tsx`), which is not a state the page
+   controls. The mask below is what makes it unconditional, and it is free: WebKit samples
+   the box's *declared* `background-color`, and neither `isHiddenOrNearlyTransparent()` nor
+   the candidate test looks at masking — only at `opacity` and `visibility`. So the anchor
+   reads at full strength to the browser and fades to nothing for the reader.
+
+   `pointer-events: none` is safe here: the first hit test runs with
+   `IgnoreCSSPointerEventsProperty`, so the property only decides anything for a box that
+   has already been rejected on other grounds.
 
    The scroll owner points `--chrome-tint` at the surface each bar is drawn over; the
-   paper page is the no-JavaScript floor. */
+   paper page is the no-JavaScript floor. See docs/ios26-tint-root-cause.md. */
 .chrome-tint {
   position: fixed;
-  /* Above every painted layer on the page, matching what the browser samples. Nothing is
-     drawn from it, so the order is a statement of intent rather than a visual decision. */
+  /* Above every painted layer on the page, so the hit test at the window edge lands here
+     rather than on the chapter plate — which, being window-sized, sends WebKit down the
+     `preferExistingColor` branch and freezes the bar at the colour it already had. */
   z-index: 120;
   left: 0;
   width: 100%;
-  /* Comfortably over the 3 px floor: the reverse-engineered rule also wants a few pixels
-     of height before Safari will keep re-sampling a colour that changes. */
+  /* Over the 10 px floor with room to spare, and still inside the chrome-covered band. */
   height: 16px;
   background-color: var(--chrome-tint, var(--paper));
-  opacity: 0;
+  /* Stated rather than left to the initial value: this is the constraint the anchor has
+     already been broken on once, and anything below 0.1 silently stops the sampling. */
+  opacity: 1;
   pointer-events: none;
 }
 
+/* Solid for the first 4 px — the sample point is at 4 px, and that strip is the deepest
+   inside the status bar and the home indicator, where nothing is ever read — then out to
+   nothing across the remaining 12 px, so the seam against the photograph is a gradient
+   rather than an edge. */
 .chrome-tint[data-edge="top"] {
   top: 0;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 4px, transparent);
+  mask-image: linear-gradient(to bottom, #000 0 4px, transparent);
 }
 
 .chrome-tint[data-edge="bottom"] {
   bottom: 0;
+  -webkit-mask-image: linear-gradient(to top, #000 0 4px, transparent);
+  mask-image: linear-gradient(to top, #000 0 4px, transparent);
 }
 
 .chapter-photo-pin picture {

@@ -201,14 +201,28 @@ test("keeps each browser bar tinted from the surface behind it", async ({ page }
       if (layers.length !== 2) throw new Error("both chrome tint anchors are required");
       return layers.map((layer) => {
         const style = getComputedStyle(layer);
-        // The three properties Safari's sampling depends on. `z-index: -1` is what broke
-        // it, and an anchor that starts painting is a visible band on the page.
+        const box = layer.getBoundingClientRect();
+        // The conditions `LocalFrameView::fixedContainerEdges()` actually applies, read
+        // from WebKit rather than from the community write-ups the earlier versions of
+        // this guard encoded. Both previous regressions are covered: `z-index: -1` put the
+        // anchor under the paper canvas so the edge hit test never landed on it, and
+        // `opacity: 0` put it below `isHiddenOrNearlyTransparent()`'s 0.1 floor, which
+        // discards the box outright. See docs/ios26-tint-root-cause.md.
+        //
+        // This is a static check of the predicate, not evidence that Safari honours it.
+        // Playwright's WebKit has no native browser chrome and never runs the Cocoa
+        // sampling path, so a green run here means "the anchor qualifies and the colour we
+        // computed is the colour on screen" — never "the bars are correct on the device".
         if (style.position !== "fixed")
           throw new Error("an anchor is not viewport-fixed");
         if (Number(style.zIndex) < 0)
           throw new Error("an anchor is painted below the page");
-        if (style.opacity !== "0")
-          throw new Error("an anchor is visible to the reader");
+        if (!(Number(style.opacity) >= 0.1))
+          throw new Error("an anchor is too transparent for WebKit to sample");
+        if (!(box.height > 10))
+          throw new Error("an anchor is thin enough to read as a border");
+        if (!(box.width >= window.innerWidth * 0.9))
+          throw new Error("an anchor is too narrow to own its window edge");
         const parts = style.backgroundColor.match(/[\d.]+/g);
         if (!parts) throw new Error("a chrome tint anchor has no colour");
         return parts.slice(0, 3).map(Number);

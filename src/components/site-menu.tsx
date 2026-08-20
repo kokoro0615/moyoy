@@ -89,8 +89,9 @@ export function SiteMenu({ children }: Readonly<{ children: ReactNode }>) {
       <div data-app-shell ref={appShellRef}>
         {/* Safari 26 colours its status bar and toolbar from a `position: fixed` layer
             rather than from `theme-color`; these are that layer, one per window edge.
-            They are `opacity: 0` — invisible to the reader, still sampled by the browser.
-            See `.chrome-tint` in globals.css. */}
+            They are opaque, and painted the mean colour of the surface behind them, because
+            WebKit discards a near-transparent box rather than sampling it. See
+            `.chrome-tint` in globals.css. */}
         <div aria-hidden="true" className="chrome-tint" data-edge="top" />
         <div aria-hidden="true" className="chrome-tint" data-edge="bottom" />
         {children}
