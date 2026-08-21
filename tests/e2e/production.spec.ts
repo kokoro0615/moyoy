@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { settleMenu } from "../support/menu";
 
@@ -18,6 +18,43 @@ async function scrollAndSettle(page: Page, scrollY: number) {
       }),
     scrollY,
   );
+}
+
+/**
+ * A settled reading of a chapter's `--chapter-pan-y`.
+ *
+ * The pan is eased toward its scroll-derived target rather than jumping to it, so no fixed
+ * wait is a settled reading. Measured in WebKit against the production build: a flat 120 ms
+ * read the initial `0%` in five runs of six on a loaded machine, and two animation frames
+ * read a mid-flight value (-31.9 where the settled one is -47.1). Waiting for the number to
+ * stop moving waits for the thing being asserted.
+ */
+async function readSettledPan(page: Page, image: Locator) {
+  const read = () =>
+    image.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).getPropertyValue("--chapter-pan-y")),
+    );
+  const frame = () =>
+    page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
+  let previous = await read();
+  await expect
+    .poll(
+      async () => {
+        await frame();
+        const current = await read();
+        const settled = current === previous;
+        previous = current;
+        return settled;
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  return previous;
 }
 
 test("renders the approved production narrative and fidelity landmarks", async ({
@@ -542,14 +579,7 @@ test("the chapter plate is viewport-fixed and the photograph pans through its fr
         (scrollY) => window.scrollTo(0, Math.max(0, scrollY)),
         top + factor * 900,
       );
-      await page.waitForTimeout(120);
-      pans.push(
-        await image.evaluate((element) =>
-          Number.parseFloat(
-            getComputedStyle(element).getPropertyValue("--chapter-pan-y"),
-          ),
-        ),
-      );
+      pans.push(await readSettledPan(page, image));
       plateTops.push(
         await plate.evaluate((element) => element.getBoundingClientRect().top),
       );

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import sharp from "sharp";
 
-import { settleMenu } from "../support/menu";
+import { openMenu } from "../support/menu";
 
 const requiredViewports = [
   { height: 900, label: "1440x900", width: 1440 },
@@ -293,8 +293,7 @@ test("offers Safari no colour for either browser bar with the menu open", async 
     await page.evaluate(() => window.scrollTo(0, 3800));
     await page.waitForTimeout(80);
 
-    await page.locator("button[data-fidelity-action='open-menu']").click();
-    await settleMenu(page);
+    await openMenu(page);
     await expect(
       page.locator("dialog#site-menu[open][data-state='open']"),
     ).toBeVisible();
